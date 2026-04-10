@@ -445,15 +445,18 @@ const COURSES = {
   'GBA 372': {name:'Business Analytics', icon:'📊', color:'var(--red)'},
 };
 
-// ── TASKS — seeded from real Notion data ──
+// ── TASKS — seeded from real Notion data (synced Apr 10 2026) ──
 let tasks = [
   {id:1, text:'HW 9A', course:'CE 331', tag:'hw', done:false, fromNotion:true, due:'Apr 13'},
   {id:2, text:'HW 9B', course:'CE 331', tag:'hw', done:false, fromNotion:true, due:'Apr 15'},
   {id:3, text:'HW 10A', course:'CE 331', tag:'hw', done:false, fromNotion:true, due:'Apr 20'},
-  {id:4, text:'Final Exam', course:'CE 340', tag:'exam', done:false, fromNotion:true, due:'Apr 28'},
-  {id:5, text:'Final Exam', course:'CE 331', tag:'exam', done:false, fromNotion:true, due:'Apr 29'},
-  {id:6, text:'Final Exam', course:'ME 216', tag:'exam', done:false, fromNotion:true, due:'Apr 29'},
+  {id:4, text:'Final Exam', course:'CE 331', tag:'exam', done:false, fromNotion:true, due:'Apr 29'},
+  {id:5, text:'Final Exam', course:'CE 340', tag:'exam', done:false, fromNotion:true, due:'Apr 28'},
+  {id:6, text:'Homework 5 Corrections', course:'CE 378', tag:'hw', done:false, fromNotion:true, due:'Apr 15'},
   {id:7, text:'Exam 3', course:'CE 378', tag:'exam', done:false, fromNotion:true, due:'May 1'},
+  {id:8, text:'HW 7 Ch 9', course:'ME 216', tag:'hw', done:false, fromNotion:true, due:'Apr 13'},
+  {id:9, text:'Final Exam', course:'ME 216', tag:'exam', done:false, fromNotion:true, due:'Apr 29'},
+  {id:10, text:'Final', course:'COM 122', tag:'exam', done:false, fromNotion:true, due:'Apr 27'},
 ];
 
 // ── RENDER ALL TASKS ──
@@ -538,6 +541,7 @@ const NOTION_TASKS_CACHE = [
   {text:'HW 10A', course:'CE 331', tag:'hw', due:'Apr 20'},
   {text:'Final Exam', course:'CE 331', tag:'exam', due:'Apr 29'},
   {text:'Final Exam', course:'CE 340', tag:'exam', due:'Apr 28'},
+  {text:'Homework 5 Corrections', course:'CE 378', tag:'hw', due:'Apr 15'},
   {text:'Exam 3', course:'CE 378', tag:'exam', due:'May 1'},
   {text:'HW 7 Ch 9', course:'ME 216', tag:'hw', due:'Apr 13'},
   {text:'Final Exam', course:'ME 216', tag:'exam', due:'Apr 29'},
@@ -555,7 +559,7 @@ async function syncFromNotion(){
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       model:'claude-sonnet-4-20250514',max_tokens:800,
-      system:`You are a Notion data bridge. Return ONLY valid JSON array, no markdown, no extra text.\nActive tasks in Hayden's Schoolwork Tracker pulled from Notion on April 10, 2026.\nEach task MUST have the exact course code so it routes to the correct class card.\nCourse codes: CE 331, CE 340, CE 378, ME 216, COM 122, GBA 372\nTasks:\n- HW 9A | CE 331 | hw | Apr 13\n- HW 9B | CE 331 | hw | Apr 15\n- HW 10A | CE 331 | hw | Apr 20\n- Final Exam | CE 331 | exam | Apr 29\n- Final Exam | CE 340 | exam | Apr 28\n- Exam 3 | CE 378 | exam | May 1\n- HW 7 Ch 9 | ME 216 | hw | Apr 13\n- Final Exam | ME 216 | exam | Apr 29\n- Final | COM 122 | exam | Apr 27\nFormat: [{"text":"task name","course":"EXACT course code","tag":"hw or exam or proj or read","due":"Mon DD"}]`,
+      system:`You are a Notion data bridge. Return ONLY a valid JSON array, no markdown, no extra text.\nThese are Hayden's active tasks (Not Started or In Progress only) from his Notion Schoolwork Tracker as of April 10, 2026.\nExclude anything Turned In or Done. Course codes must be exact.\nCourse codes: CE 331, CE 340, CE 378, ME 216, COM 122, GBA 372\nActive tasks:\n- HW 9A | CE 331 | hw | Apr 13\n- HW 9B | CE 331 | hw | Apr 15\n- HW 10A | CE 331 | hw | Apr 20\n- Final Exam | CE 331 | exam | Apr 29\n- Final Exam | CE 340 | exam | Apr 28\n- Homework 5 Corrections | CE 378 | hw | Apr 15\n- Exam 3 | CE 378 | exam | May 1\n- HW 7 Ch 9 | ME 216 | hw | Apr 13\n- Final Exam | ME 216 | exam | Apr 29\n- Final | COM 122 | exam | Apr 27\nFormat: [{"text":"task name","course":"EXACT course code","tag":"hw or exam or proj or read","due":"Mon DD"}]`,
       messages:[{role:'user',content:'Sync.'}]
     })});
     const data=await res.json();
