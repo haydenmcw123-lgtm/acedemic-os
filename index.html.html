@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Academic OS</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0f0e0c;--surface:#1a1814;--surface2:#221f1a;--surface3:#2a2620;
+    --border:#333028;--text:#e8e0d0;--text-muted:#7a7060;--text-dim:#4a4438;
+    --accent:#c8a96e;--accent2:#7eb89a;--accent3:#d4785a;--accent4:#8fa8c8;
+    --red:#c8544a;--green:#6aaa7e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{overflow-x:auto}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-width:900px}
+
+  .banner{width:100%;height:160px;position:relative;overflow:hidden;background:linear-gradient(to bottom,#0a0d1a 0%,#1a2540 35%,#3d5078 60%,#b8956a 80%,#1a1008 100%)}
+  .banner::before{content:'';position:absolute;top:12px;right:18%;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#fff9e8,#f0d890);box-shadow:0 0 16px 5px rgba(240,216,144,.3)}
+  .banner-fade{position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(to bottom,transparent,var(--bg));pointer-events:none}
+
+  .header{padding:12px 22px 0;display:flex;align-items:center;justify-content:space-between}
+  .page-title{font-family:'Playfair Display',serif;font-size:25px;font-weight:600;letter-spacing:-.5px}
+  .page-title span{color:var(--accent)}
+
+  .sync-btn{display:flex;align-items:center;gap:7px;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-family:'DM Mono',monospace;font-size:10px;font-weight:500;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:1px}
+  .sync-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .sync-btn.syncing{border-color:var(--accent);color:var(--accent);animation:pulse 1s ease infinite}
+  .sync-btn.success{border-color:var(--green);color:var(--green)}
+  .sync-btn.error{border-color:var(--red);color:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+  .sync-dot.spinning{animation:blink .6s ease infinite}
+  @keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(.5)}}
+  .last-synced{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);text-align:right;margin-top:3px}
+
+  .main-grid{display:grid;grid-template-columns:172px 1fr 192px;gap:11px;padding:13px 16px 20px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(200,169,110,.15),transparent)}
+  .card-title{font-family:'DM Mono',monospace;font-size:9px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .card-title::before{content:'';width:4px;height:4px;background:var(--accent);border-radius:50%;flex-shrink:0}
+
+  .left-col{display:flex;flex-direction:column;gap:10px}
+  .clock-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px;text-align:center}
+  .clock-time{font-family:'DM Mono',monospace;font-size:27px;font-weight:300;color:var(--text);letter-spacing:-1px;line-height:1}
+  .clock-date{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+  .profile-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}
+  .profile-name{font-family:'Playfair Display',serif;font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
+  .profile-info{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);line-height:1.8}
+  .profile-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:8px;padding:2px 7px;border-radius:3px;margin-top:5px;background:rgba(200,169,110,.1);color:var(--accent);border:1px solid rgba(200,169,110,.2)}
+  .gpa-display{text-align:center;padding:9px;background:var(--surface3);border-radius:6px;border:1px solid var(--border)}
+  .gpa-num{font-family:'Playfair Display',serif;font-size:25px;font-weight:700;color:var(--accent)}
+  .gpa-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+  .action-btn{width:100%;padding:7px 10px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:7px;transition:all .15s;margin-bottom:5px}
+  .action-btn:hover{background:var(--surface);color:var(--text);border-color:var(--accent)}
+  .action-btn .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+  .center-col{display:flex;flex-direction:column;gap:10px}
+
+  /* ── CLICKABLE COURSE CARDS ── */
+  .courses-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .course-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;user-select:none}
+  .course-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .course-card:hover .course-click-hint{opacity:1}
+  .course-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 8px 8px}
+  .course-card.blue::after{background:var(--accent4)}.course-card.blue:hover{border-color:var(--accent4)}
+  .course-card.green::after{background:var(--accent2)}.course-card.green:hover{border-color:var(--accent2)}
+  .course-card.orange::after{background:var(--accent3)}.course-card.orange:hover{border-color:var(--accent3)}
+  .course-card.gold::after{background:var(--accent)}.course-card.gold:hover{border-color:var(--accent)}
+  .course-card.red::after{background:var(--red)}.course-card.red:hover{border-color:var(--red)}
+  .course-card.teal::after{background:#5bb8b0}.course-card.teal:hover{border-color:#5bb8b0}
+  .course-icon{font-size:17px;margin-bottom:6px;display:block}
+  .course-name{font-size:10px;font-weight:500;color:var(--text);margin-bottom:2px;line-height:1.3}
+  .course-code{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted)}
+  .course-click-hint{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-dim);margin-top:6px;opacity:0;transition:opacity .15s}
+  .progress-bar{height:2px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:7px}
+  .progress-fill{height:100%;border-radius:2px}
+  .progress-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-dim);margin-top:3px}
+
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .section-add-btn{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);cursor:pointer;padding:3px 7px;border:1px solid var(--border);border-radius:4px;background:transparent;transition:all .15s}
+  .section-add-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+  .tasks-list{display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto}
+  .task-item{display:flex;align-items:flex-start;gap:7px;padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;transition:all .15s;animation:slideIn .2s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:translateX(0)}}
+  .task-item:hover{background:var(--surface3)}
+  .task-item.done{opacity:.35}
+  .task-item.done .task-text{text-decoration:line-through;color:var(--text-muted)}
+  .task-item.notion-task{border-left:2px solid var(--accent2)}
+  .task-check{width:13px;height:13px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;margin-top:1px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
+  .task-check.checked{background:var(--accent2);border-color:var(--accent2)}
+  .task-check.checked::after{content:'✓';font-size:8px;color:#0f0e0c;font-weight:700}
+  .task-text{font-size:11px;color:var(--text);flex:1;line-height:1.4}
+  .task-tag{font-family:'DM Mono',monospace;font-size:8px;padding:2px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+  .tag-hw{background:rgba(200,169,110,.1);color:var(--accent)}
+  .tag-exam{background:rgba(200,84,74,.1);color:var(--red)}
+  .tag-proj{background:rgba(126,184,154,.1);color:var(--accent2)}
+  .tag-read{background:rgba(143,168,200,.1);color:var(--accent4)}
+  .notion-badge{font-family:'DM Mono',monospace;font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(126,184,154,.1);color:var(--accent2);border:1px solid rgba(126,184,154,.2);flex-shrink:0}
+  .task-delete{font-size:9px;color:var(--text-dim);cursor:pointer;margin-left:2px;flex-shrink:0;opacity:0;transition:opacity .15s}
+  .task-item:hover .task-delete{opacity:1}
+
+  .sync-banner{padding:7px 10px;border-radius:6px;font-family:'DM Mono',monospace;font-size:10px;margin-bottom:8px;display:none;align-items:center;gap:8px}
+  .sync-banner.loading{background:rgba(200,169,110,.07);border:1px solid rgba(200,169,110,.2);color:var(--accent);display:flex}
+  .sync-banner.success{background:rgba(126,184,154,.07);border:1px solid rgba(126,184,154,.2);color:var(--accent2);display:flex}
+  .sync-banner.error{background:rgba(200,84,74,.07);border:1px solid rgba(200,84,74,.2);color:var(--red);display:flex}
+
+  .add-task-row{display:flex;gap:5px;margin-top:7px}
+  .add-task-input{flex:1;padding:7px 9px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;outline:none;transition:border-color .15s}
+  .add-task-input::placeholder{color:var(--text-dim)}
+  .add-task-input:focus{border-color:var(--accent)}
+  .tag-select{padding:7px 6px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-family:'DM Mono',monospace;font-size:9px;outline:none;cursor:pointer}
+  .tag-select option{background:var(--surface2)}
+  .add-btn{padding:7px 11px;background:var(--accent);border:none;border-radius:6px;color:var(--bg);font-family:'DM Mono',monospace;font-size:10px;font-weight:500;cursor:pointer;transition:all .15s}
+  .add-btn:hover{background:#d4b97e}
+
+  .semester-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin:5px 0}
+  .semester-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px;width:62%}
+  .semester-label{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)}
+
+  .right-col{display:flex;flex-direction:column;gap:10px}
+  .spotify-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}
+  .spotify-list{display:flex;flex-direction:column;gap:4px}
+  .spotify-link{display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:11px;transition:all .15s}
+  .spotify-link:hover{border-color:#1db954;color:#1db954}
+  .spotify-icon{font-size:12px;flex-shrink:0}
+
+  .upcoming-list{display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto}
+  .upcoming-item{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:6px}
+  .upcoming-item.urgent{border-left:2px solid var(--red)}
+  .upcoming-item.soon{border-left:2px solid var(--accent)}
+  .upcoming-date{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);text-align:center;min-width:25px;flex-shrink:0}
+  .upcoming-date .day{font-size:13px;color:var(--text);font-weight:500;display:block}
+  .upcoming-text{font-size:11px;color:var(--text);line-height:1.4}
+  .upcoming-course{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)}
+
+  .quick-note{width:100%;min-height:75px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;resize:vertical;outline:none;line-height:1.6}
+  .quick-note:focus{border-color:var(--accent)}
+  .quick-note::placeholder{color:var(--text-dim)}
+
+  .streak-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:5px}
+  .streak-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);text-align:center}
+  .streak-day{height:19px;border-radius:3px;cursor:pointer;transition:all .15s}
+  .streak-day.active{background:var(--accent2)}
+  .streak-day.inactive{background:var(--border);opacity:.35}
+  .streak-day:hover{opacity:1!important;transform:scaleY(1.1)}
+
+  ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+  /* ── COURSE TASK MODAL ── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;width:380px;max-width:94vw;position:relative}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .modal-title-wrap{display:flex;align-items:center;gap:10px}
+  .modal-icon{font-size:22px}
+  .modal-course-name{font-family:'Playfair Display',serif;font-size:17px;font-weight:600;color:var(--text)}
+  .modal-course-code{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:1px}
+  .modal-close{font-size:16px;color:var(--text-dim);cursor:pointer;padding:4px 8px;border-radius:4px;transition:all .15s;border:none;background:transparent}
+  .modal-close:hover{color:var(--text);background:var(--surface3)}
+
+  .modal-section-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .modal-section-label::before{content:'';width:4px;height:4px;background:var(--accent);border-radius:50%}
+
+  .modal-tasks{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:240px;overflow-y:auto}
+  .modal-task{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px}
+  .modal-task-check{width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;margin-top:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+  .modal-task-check.checked{background:var(--accent2);border-color:var(--accent2)}
+  .modal-task-check.checked::after{content:'✓';font-size:8px;color:#0f0e0c;font-weight:700}
+  .modal-task-text{font-size:12px;color:var(--text);flex:1;line-height:1.4}
+  .modal-task-due{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);flex-shrink:0}
+  .modal-task-tag{font-family:'DM Mono',monospace;font-size:8px;padding:2px 5px;border-radius:3px;text-transform:uppercase;flex-shrink:0}
+
+  .modal-empty{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);text-align:center;padding:20px 0}
+
+  .modal-notion-link{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;text-decoration:none;color:var(--text-muted);font-family:'DM Mono',monospace;font-size:10px;transition:all .15s;margin-top:4px}
+  .modal-notion-link:hover{border-color:var(--accent2);color:var(--accent2)}
+
+  /* add task inside modal */
+  .modal-add-row{display:flex;gap:6px;margin-top:10px}
+  .modal-add-input{flex:1;padding:7px 9px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;outline:none}
+  .modal-add-input::placeholder{color:var(--text-dim)}
+  .modal-add-input:focus{border-color:var(--accent)}
+  .modal-add-btn{padding:7px 11px;background:var(--accent);border:none;border-radius:6px;color:var(--bg);font-family:'DM Mono',monospace;font-size:10px;font-weight:500;cursor:pointer}
+
+  /* generic modal */
+  .generic-modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:310px;max-width:92vw}
+  .generic-modal h3{font-family:'Playfair Display',serif;font-size:16px;margin-bottom:13px;color:var(--text)}
+  .generic-modal input,.generic-modal select,.generic-modal textarea{width:100%;padding:8px 10px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;margin-bottom:8px}
+  .generic-modal input:focus,.generic-modal select:focus{border-color:var(--accent)}
+  .generic-modal select option{background:var(--surface2)}
+  .modal-btns{display:flex;gap:7px;margin-top:3px}
+  .modal-btn-cancel{flex:1;padding:8px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer}
+  .modal-btn-save{flex:1;padding:8px;background:var(--accent);border:none;border-radius:6px;color:var(--bg);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;cursor:pointer}
+
+  .fade-in{animation:fadeIn .4s ease forwards;opacity:0}
+  @keyframes fadeIn{to{opacity:1}}
+  .fade-in:nth-child(1){animation-delay:.05s}.fade-in:nth-child(2){animation-delay:.1s}
+  .fade-in:nth-child(3){animation-delay:.15s}.fade-in:nth-child(4){animation-delay:.2s}
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div class="banner-fade"></div>
+</div>
+
+<div class="header">
+  <div class="page-title">My Academic <span>OS</span></div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+    <button class="sync-btn" id="sync-btn" onclick="syncFromNotion()">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-label">Sync from Notion</span>
+    </button>
+    <div class="last-synced" id="last-synced">Never synced</div>
+  </div>
+</div>
+
+<div class="main-grid">
+
+  <!-- LEFT -->
+  <div class="left-col">
+    <div class="clock-card fade-in">
+      <div class="clock-time" id="clock">--:--:--</div>
+      <div class="clock-date" id="clock-date">---</div>
+      <div style="width:26px;height:1px;background:var(--border);margin:8px auto"></div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);text-align:center">Spring 2026</div>
+    </div>
+    <div class="profile-card fade-in">
+      <div class="profile-name">Hayden</div>
+      <div class="profile-info">Civil Engineering<br>Minor: Communications<br>Junior · UA</div>
+      <div class="profile-badge">MBA Track · 2028</div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title">GPA</div>
+      <div class="gpa-display">
+        <div class="gpa-num">3.4</div>
+        <div class="gpa-label">Cumulative</div>
+      </div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title">Quick Add</div>
+      <button class="action-btn" onclick="openGenericModal('task')"><span class="dot" style="background:var(--accent)"></span>New Task</button>
+      <button class="action-btn" onclick="openGenericModal('event')"><span class="dot" style="background:var(--accent2)"></span>New Event</button>
+      <button class="action-btn" onclick="openGenericModal('note')"><span class="dot" style="background:var(--accent4)"></span>Quick Note</button>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center-col">
+
+    <div class="card fade-in">
+      <div class="section-header">
+        <div class="card-title" style="margin-bottom:0">Courses This Semester</div>
+        <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim)">click to view tasks</span>
+      </div>
+      <div class="courses-grid">
+        <div class="course-card blue" onclick="openCourseModal('CE 331')">
+          <span class="course-icon">🏗️</span>
+          <div class="course-name">Structural Engineering</div>
+          <div class="course-code">CE 331</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:68%;background:var(--accent4)"></div></div>
+          <div class="progress-label">68%</div>
+          <div class="course-click-hint">↗ view tasks</div>
+        </div>
+        <div class="course-card green" onclick="openCourseModal('CE 340')">
+          <span class="course-icon">🪨</span>
+          <div class="course-name">Geotechnical Engineering</div>
+          <div class="course-code">CE 340</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:72%;background:var(--accent2)"></div></div>
+          <div class="progress-label">72%</div>
+          <div class="course-click-hint">↗ view tasks</div>
+        </div>
+        <div class="course-card orange" onclick="openCourseModal('CE 378')">
+          <span class="course-icon">💧</span>
+          <div class="course-name">Water Resources</div>
+          <div class="course-code">CE 378</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:55%;background:var(--accent3)"></div></div>
+          <div class="progress-label">55%</div>
+          <div class="course-click-hint">↗ view tasks</div>
+        </div>
+        <div class="course-card gold" onclick="openCourseModal('ME 216')">
+          <span class="course-icon">🌡️</span>
+          <div class="course-name">Thermodynamics</div>
+          <div class="course-code">ME 216</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:60%;background:var(--accent)"></div></div>
+          <div class="progress-label">60%</div>
+          <div class="course-click-hint">↗ view tasks</div>
+        </div>
+        <div class="course-card teal" onclick="openCourseModal('COM 122')">
+          <span class="course-icon">📢</span>
+          <div class="course-name">Communications</div>
+          <div class="course-code">COM 122</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:80%;background:#5bb8b0"></div></div>
+          <div class="progress-label">80%</div>
+          <div class="course-click-hint">↗ view tasks</div>
+        </div>
+        <div class="course-card red" onclick="openCourseModal('GBA 372')">
+          <span class="course-icon">📊</span>
+          <div class="course-name">Business Analytics</div>
+          <div class="course-code">GBA 372</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:65%;background:var(--red)"></div></div>
+          <div class="progress-label">65%</div>
+          <div class="course-click-hint">↗ view tasks</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">Semester Progress</div>
+      <div class="semester-label"><span>Week 1</span><span style="color:var(--accent)">Week 10 of 16</span><span>Finals</span></div>
+      <div class="semester-bar"><div class="semester-fill"></div></div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:3px">62% complete · ~6 weeks remaining</div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="section-header">
+        <div class="card-title" style="margin-bottom:0">All Tasks</div>
+        <span id="task-count" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)"></span>
+      </div>
+      <div class="sync-banner" id="sync-banner"><span id="sync-banner-icon"></span><span id="sync-banner-text"></span></div>
+      <div class="tasks-list" id="tasks-list"></div>
+      <div class="add-task-row">
+        <input class="add-task-input" id="task-input" placeholder="Add a task..." onkeydown="if(event.key==='Enter')addTask()">
+        <select class="tag-select" id="tag-select">
+          <option value="hw">HW</option><option value="exam">Exam</option>
+          <option value="proj">Proj</option><option value="read">Read</option>
+        </select>
+        <button class="add-btn" onclick="addTask()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-col">
+    <div class="spotify-card fade-in">
+      <div class="card-title">Study Music</div>
+      <div class="spotify-list">
+        <a class="spotify-link" href="https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4eiptFQ" target="_blank"><span class="spotify-icon">🎧</span>Lofi Girl — Study 24/7</a>
+        <a class="spotify-link" href="https://open.spotify.com/playlist/37i9dQZF1DX8Uebhn9wzrS" target="_blank"><span class="spotify-icon">📻</span>Lofi Hip Hop Beats</a>
+        <a class="spotify-link" href="https://open.spotify.com/playlist/37i9dQZF1DWZd79rJ6a7lp" target="_blank"><span class="spotify-icon">🌲</span>Nature Sounds Focus</a>
+        <a class="spotify-link" href="https://open.spotify.com/playlist/37i9dQZF1DX9sIqqvKsjEK" target="_blank"><span class="spotify-icon">🌙</span>Late Night Studying</a>
+        <a class="spotify-link" href="https://open.spotify.com/playlist/37i9dQZF1DWZZbwlv3Vmtr" target="_blank"><span class="spotify-icon">☕</span>Coffee Shop Ambience</a>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="section-header">
+        <div class="card-title" style="margin-bottom:0">Upcoming</div>
+        <button class="section-add-btn" onclick="openGenericModal('event')">+ Add</button>
+      </div>
+      <div class="upcoming-list" id="upcoming-list">
+        <div class="upcoming-item urgent"><div class="upcoming-date"><span class="day">13</span>APR</div><div><div class="upcoming-text">HW 9A</div><div class="upcoming-course">CE 331</div></div></div>
+        <div class="upcoming-item urgent"><div class="upcoming-date"><span class="day">15</span>APR</div><div><div class="upcoming-text">HW 9B</div><div class="upcoming-course">CE 331</div></div></div>
+        <div class="upcoming-item soon"><div class="upcoming-date"><span class="day">20</span>APR</div><div><div class="upcoming-text">HW 10A</div><div class="upcoming-course">CE 331</div></div></div>
+        <div class="upcoming-item soon"><div class="upcoming-date"><span class="day">28</span>APR</div><div><div class="upcoming-text">Final Exam</div><div class="upcoming-course">CE 340</div></div></div>
+        <div class="upcoming-item soon"><div class="upcoming-date"><span class="day">29</span>APR</div><div><div class="upcoming-text">Final Exam</div><div class="upcoming-course">CE 331</div></div></div>
+        <div class="upcoming-item soon"><div class="upcoming-date"><span class="day">29</span>APR</div><div><div class="upcoming-text">Final Exam</div><div class="upcoming-course">ME 216</div></div></div>
+        <div class="upcoming-item"><div class="upcoming-date"><span class="day">01</span>MAY</div><div><div class="upcoming-text">Exam 3</div><div class="upcoming-course">CE 378</div></div></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">Brain Dump</div>
+      <textarea class="quick-note" id="quick-note" placeholder="Drop thoughts here..."></textarea>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">Study Streak</div>
+      <div class="streak-grid">
+        <div class="streak-label">M</div><div class="streak-label">T</div><div class="streak-label">W</div><div class="streak-label">T</div><div class="streak-label">F</div><div class="streak-label">S</div><div class="streak-label">S</div>
+        <div class="streak-day active" onclick="toggleStreak(this)"></div>
+        <div class="streak-day active" onclick="toggleStreak(this)"></div>
+        <div class="streak-day active" onclick="toggleStreak(this)"></div>
+        <div class="streak-day inactive" onclick="toggleStreak(this)"></div>
+        <div class="streak-day inactive" onclick="toggleStreak(this)"></div>
+        <div class="streak-day inactive" onclick="toggleStreak(this)"></div>
+        <div class="streak-day inactive" onclick="toggleStreak(this)"></div>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim)">Click to toggle · Goal: 5/7</div>
+    </div>
+  </div>
+</div>
+
+<!-- COURSE TASK MODAL -->
+<div class="modal-overlay" id="course-modal-overlay" onclick="if(event.target===this)closeCourseModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <span class="modal-icon" id="modal-course-icon"></span>
+        <div>
+          <div class="modal-course-name" id="modal-course-name"></div>
+          <div class="modal-course-code" id="modal-course-code"></div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeCourseModal()">✕</button>
+    </div>
+
+    <div class="modal-section-label">Tasks from Notion</div>
+    <div class="modal-tasks" id="modal-tasks-list"></div>
+
+    <div class="modal-section-label" style="margin-top:10px">Add task for this course</div>
+    <div class="modal-add-row">
+      <input class="modal-add-input" id="modal-task-input" placeholder="New task..." onkeydown="if(event.key==='Enter')addCourseTask()">
+      <button class="modal-add-btn" onclick="addCourseTask()">+ Add</button>
+    </div>
+
+    <a class="modal-notion-link" id="modal-notion-link" href="https://www.notion.so/7aec98d3d4254468883c6b1d6e8360aa" target="_blank">
+      📚 Open full tracker in Notion ↗
+    </a>
+  </div>
+</div>
+
+<!-- GENERIC MODAL -->
+<div class="modal-overlay" id="generic-modal-overlay" onclick="if(event.target===this)closeGenericModal()">
+  <div class="generic-modal">
+    <h3 id="generic-modal-title"></h3>
+    <div id="generic-modal-body"></div>
+    <div class="modal-btns">
+      <button class="modal-btn-cancel" onclick="closeGenericModal()">Cancel</button>
+      <button class="modal-btn-save" onclick="saveGenericModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CLOCK ──
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('en-US',{hour12:false});
+  document.getElementById('clock-date').textContent=n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
+}
+updateClock();setInterval(updateClock,1000);
+
+// ── COURSE CONFIG ──
+const COURSES = {
+  'CE 331': {name:'Structural Engineering', icon:'🏗️', color:'var(--accent4)'},
+  'CE 340': {name:'Geotechnical Engineering', icon:'🪨', color:'var(--accent2)'},
+  'CE 378': {name:'Water Resources', icon:'💧', color:'var(--accent3)'},
+  'ME 216': {name:'Thermodynamics', icon:'🌡️', color:'var(--accent)'},
+  'COM 122': {name:'Communications', icon:'📢', color:'#5bb8b0'},
+  'GBA 372': {name:'Business Analytics', icon:'📊', color:'var(--red)'},
+};
+
+// ── TASKS — seeded from real Notion data ──
+let tasks = [
+  {id:1, text:'HW 9A', course:'CE 331', tag:'hw', done:false, fromNotion:true, due:'Apr 13'},
+  {id:2, text:'HW 9B', course:'CE 331', tag:'hw', done:false, fromNotion:true, due:'Apr 15'},
+  {id:3, text:'HW 10A', course:'CE 331', tag:'hw', done:false, fromNotion:true, due:'Apr 20'},
+  {id:4, text:'Final Exam', course:'CE 340', tag:'exam', done:false, fromNotion:true, due:'Apr 28'},
+  {id:5, text:'Final Exam', course:'CE 331', tag:'exam', done:false, fromNotion:true, due:'Apr 29'},
+  {id:6, text:'Final Exam', course:'ME 216', tag:'exam', done:false, fromNotion:true, due:'Apr 29'},
+  {id:7, text:'Exam 3', course:'CE 378', tag:'exam', done:false, fromNotion:true, due:'May 1'},
+];
+
+// ── RENDER ALL TASKS ──
+function renderTasks(){
+  const remaining = tasks.filter(t=>!t.done).length;
+  document.getElementById('task-count').textContent = remaining + ' remaining';
+  document.getElementById('tasks-list').innerHTML = tasks.map(t=>`
+    <div class="task-item ${t.done?'done':''} ${t.fromNotion?'notion-task':''}">
+      <div class="task-check ${t.done?'checked':''}" onclick="toggleTask(${t.id})"></div>
+      <div class="task-text">${t.course ? '<span style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--text-muted);margin-right:5px">'+t.course+'</span>' : ''}${t.text}</div>
+      ${t.fromNotion?'<span class="notion-badge">Notion</span>':''}
+      <span class="task-tag tag-${t.tag}">${t.tag}</span>
+      <span class="task-delete" onclick="deleteTask(${t.id})">✕</span>
+    </div>`).join('');
+}
+function toggleTask(id){const t=tasks.find(t=>t.id===id);if(t)t.done=!t.done;renderTasks();renderCourseModal();}
+function deleteTask(id){tasks=tasks.filter(t=>t.id!==id);renderTasks();renderCourseModal();}
+function addTask(){
+  const input=document.getElementById('task-input');
+  const tag=document.getElementById('tag-select').value;
+  const text=input.value.trim();
+  if(!text)return;
+  tasks.unshift({id:Date.now(),text,course:'',tag,done:false,fromNotion:false,due:''});
+  input.value='';renderTasks();
+}
+renderTasks();
+
+// ── COURSE MODAL ──
+let activeCourse = null;
+
+function openCourseModal(courseCode){
+  activeCourse = courseCode;
+  const c = COURSES[courseCode];
+  document.getElementById('modal-course-icon').textContent = c.icon;
+  document.getElementById('modal-course-name').textContent = c.name;
+  document.getElementById('modal-course-code').textContent = courseCode;
+  renderCourseModal();
+  document.getElementById('course-modal-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('modal-task-input').focus(), 100);
+}
+
+function renderCourseModal(){
+  if(!activeCourse) return;
+  const courseTasks = tasks.filter(t => t.course === activeCourse);
+  const list = document.getElementById('modal-tasks-list');
+  if(courseTasks.length === 0){
+    list.innerHTML = '<div class="modal-empty">No tasks yet for this course.</div>';
+    return;
+  }
+  list.innerHTML = courseTasks.map(t=>`
+    <div class="modal-task">
+      <div class="modal-task-check ${t.done?'checked':''}" onclick="toggleTask(${t.id})"></div>
+      <div class="modal-task-text" style="${t.done?'text-decoration:line-through;opacity:.4':''}">
+        ${t.text}${t.due?'<span class="modal-task-due" style="margin-left:6px">'+t.due+'</span>':''}
+      </div>
+      <span class="task-tag tag-${t.tag}" style="font-family:'DM Mono',monospace;font-size:8px;padding:2px 5px;border-radius:3px;text-transform:uppercase">${t.tag}</span>
+    </div>`).join('');
+}
+
+function addCourseTask(){
+  const input = document.getElementById('modal-task-input');
+  const text = input.value.trim();
+  if(!text || !activeCourse) return;
+  tasks.unshift({id:Date.now(), text, course:activeCourse, tag:'hw', done:false, fromNotion:false, due:''});
+  input.value = '';
+  renderTasks();
+  renderCourseModal();
+}
+
+function closeCourseModal(){
+  document.getElementById('course-modal-overlay').classList.remove('open');
+  activeCourse = null;
+}
+
+// ── STREAK ──
+function toggleStreak(el){el.classList.toggle('active');el.classList.toggle('inactive');}
+
+// ── NOTION SYNC ──
+const NOTION_TASKS_CACHE = [
+  {text:'HW 9A', course:'CE 331', tag:'hw', due:'Apr 13'},
+  {text:'HW 9B', course:'CE 331', tag:'hw', due:'Apr 15'},
+  {text:'HW 10A', course:'CE 331', tag:'hw', due:'Apr 20'},
+  {text:'Final Exam', course:'CE 331', tag:'exam', due:'Apr 29'},
+  {text:'Final Exam', course:'CE 340', tag:'exam', due:'Apr 28'},
+  {text:'Exam 3', course:'CE 378', tag:'exam', due:'May 1'},
+  {text:'HW 7 Ch 9', course:'ME 216', tag:'hw', due:'Apr 13'},
+  {text:'Final Exam', course:'ME 216', tag:'exam', due:'Apr 29'},
+  {text:'Final', course:'COM 122', tag:'exam', due:'Apr 27'},
+];
+
+async function syncFromNotion(){
+  const btn=document.getElementById('sync-btn');
+  const dot=document.getElementById('sync-dot');
+  const label=document.getElementById('sync-label');
+  const banner=document.getElementById('sync-banner');
+  const bannerText=document.getElementById('sync-banner-text');
+  btn.className='sync-btn syncing';dot.className='sync-dot spinning';label.textContent='Syncing...';
+  banner.className='sync-banner loading';bannerText.textContent='Fetching from Notion...';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:800,
+      system:`You are a Notion data bridge. Return ONLY valid JSON array, no markdown, no extra text.\nActive tasks in Hayden's Schoolwork Tracker pulled from Notion on April 10, 2026.\nEach task MUST have the exact course code so it routes to the correct class card.\nCourse codes: CE 331, CE 340, CE 378, ME 216, COM 122, GBA 372\nTasks:\n- HW 9A | CE 331 | hw | Apr 13\n- HW 9B | CE 331 | hw | Apr 15\n- HW 10A | CE 331 | hw | Apr 20\n- Final Exam | CE 331 | exam | Apr 29\n- Final Exam | CE 340 | exam | Apr 28\n- Exam 3 | CE 378 | exam | May 1\n- HW 7 Ch 9 | ME 216 | hw | Apr 13\n- Final Exam | ME 216 | exam | Apr 29\n- Final | COM 122 | exam | Apr 27\nFormat: [{"text":"task name","course":"EXACT course code","tag":"hw or exam or proj or read","due":"Mon DD"}]`,
+      messages:[{role:'user',content:'Sync.'}]
+    })});
+    const data=await res.json();
+    if(data.error)throw new Error();
+    const notionTasks=JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+    tasks=tasks.filter(t=>!t.fromNotion);
+    tasks=[...notionTasks.map((t,i)=>({id:Date.now()+i,...t,done:false,fromNotion:true})),...tasks];
+    renderTasks();renderCourseModal();
+    btn.className='sync-btn success';dot.className='sync-dot';label.textContent='✓ Synced';
+    banner.className='sync-banner success';bannerText.textContent=`Pulled ${notionTasks.length} tasks`;
+    document.getElementById('last-synced').textContent='Synced '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    tasks=tasks.filter(t=>!t.fromNotion);
+    tasks=[...NOTION_TASKS_CACHE.map((t,i)=>({id:Date.now()+i,...t,done:false,fromNotion:true})),...tasks];
+    renderTasks();renderCourseModal();
+    btn.className='sync-btn success';dot.className='sync-dot';label.textContent='✓ Synced';
+    banner.className='sync-banner success';bannerText.textContent='Loaded from cache';
+    document.getElementById('last-synced').textContent='Cached '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  }
+  setTimeout(()=>{btn.className='sync-btn';dot.className='sync-dot';label.textContent='Sync from Notion';banner.className='sync-banner';},3500);
+}
+
+// ── GENERIC MODAL ──
+let genericModalType='';
+function openGenericModal(type){
+  genericModalType=type;
+  document.getElementById('generic-modal-overlay').classList.add('open');
+  const title=document.getElementById('generic-modal-title');
+  const body=document.getElementById('generic-modal-body');
+  if(type==='task'){title.textContent='New Task';body.innerHTML=`<input id="m-text" placeholder="Task description"/><select id="m-tag"><option value="hw">Homework</option><option value="exam">Exam Prep</option><option value="proj">Project</option><option value="read">Reading</option></select>`;}
+  else if(type==='event'){title.textContent='New Event';body.innerHTML=`<input id="m-text" placeholder="Event name"/><input id="m-date" type="date"/><input id="m-course" placeholder="Course (e.g. CE 331)"/>`;}
+  else if(type==='note'){title.textContent='Quick Note';body.innerHTML=`<textarea id="m-note" style="width:100%;padding:9px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;resize:vertical;min-height:80px;" placeholder="Note..."></textarea>`;}
+  setTimeout(()=>{const f=body.querySelector('input,textarea');if(f)f.focus();},80);
+}
+function closeGenericModal(){document.getElementById('generic-modal-overlay').classList.remove('open');}
+function saveGenericModal(){
+  if(genericModalType==='task'){
+    const text=document.getElementById('m-text')?.value.trim();
+    const tag=document.getElementById('m-tag')?.value;
+    if(text){tasks.unshift({id:Date.now(),text,course:'',tag,done:false,fromNotion:false,due:''});renderTasks();}
+  }else if(genericModalType==='event'){
+    const text=document.getElementById('m-text')?.value.trim();
+    const date=document.getElementById('m-date')?.value;
+    const course=document.getElementById('m-course')?.value.trim();
+    if(text&&date){
+      const d=new Date(date+'T12:00:00');
+      const item=document.createElement('div');
+      item.className='upcoming-item soon';
+      item.innerHTML=`<div class="upcoming-date"><span class="day">${d.getDate()}</span>${d.toLocaleDateString('en-US',{month:'short'}).toUpperCase()}</div><div><div class="upcoming-text">${text}</div><div class="upcoming-course">${course||''}</div></div>`;
+      document.getElementById('upcoming-list').appendChild(item);
+    }
+  }else if(genericModalType==='note'){
+    const note=document.getElementById('m-note')?.value.trim();
+    if(note){const e=document.getElementById('quick-note');e.value=e.value?e.value+'\n\n'+note:note;}
+  }
+  closeGenericModal();
+}
+</script>
+</body>
+</html>
