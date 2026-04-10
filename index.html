@@ -122,34 +122,41 @@
   .semester-label{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted)}
   .semester-mini{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px}
 
-  /* ── CALENDAR ── */
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:4px}
-  .cal-header{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px}
-  .cal-day-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-dim);text-align:center;padding:2px 0}
-  .cal-day{min-height:26px;border-radius:4px;padding:2px 3px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);cursor:pointer;transition:all .15s;position:relative;background:var(--surface2);display:flex;align-items:flex-start;justify-content:center}
-  .cal-day:hover{background:var(--surface3);color:var(--text)}
-  .cal-day.today{background:rgba(200,169,110,.15);color:var(--accent);border:1px solid rgba(200,169,110,.3);font-weight:700}
-  .cal-day.other-month{opacity:.2}
-  .cal-day.has-task::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent)}
-  .cal-day.has-exam::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--red)}
-  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-  .cal-nav-btn{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;transition:all .15s}
+  /* ── CALENDAR (WEEK VIEW) ── */
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px}
+  .cal-day-col{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .cal-day-name{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);text-align:center;text-transform:uppercase;letter-spacing:.5px}
+  .cal-day-num{width:36px;height:44px;border-radius:8px;font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all .15s;position:relative;background:var(--surface2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+  .cal-day-num:hover{background:var(--surface3);color:var(--text)}
+  .cal-day-num.today{background:rgba(200,169,110,.18);color:var(--accent);border:1px solid rgba(200,169,110,.4);font-weight:700}
+  .cal-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+  .cal-dot.hw{background:var(--accent)}
+  .cal-dot.exam{background:var(--red)}
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .cal-nav-btn{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:2px 9px;cursor:pointer;font-size:12px;transition:all .15s}
   .cal-nav-btn:hover{border-color:var(--accent);color:var(--accent)}
-  .cal-month-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--text);text-transform:uppercase;letter-spacing:1px}
+  .cal-week-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--text);text-transform:uppercase;letter-spacing:1px}
 
   /* ── SPOTIFY WIDGET ── */
   .spotify-widget{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}
-  .spotify-embed-wrap{border-radius:8px;overflow:hidden;margin-bottom:8px;background:#000}
-  .spotify-embed-wrap iframe{display:block;width:100%;border-radius:8px}
-  .spotify-input-row{display:flex;gap:5px;margin-top:6px}
+  .spotify-now{display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+  .spotify-logo{font-size:22px;flex-shrink:0}
+  .spotify-now-text{flex:1;min-width:0}
+  .spotify-now-title{font-size:11px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .spotify-now-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:2px}
+  .spotify-open-btn{padding:5px 9px;background:#1db954;border:none;border-radius:5px;color:#000;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;flex-shrink:0}
+  .spotify-open-btn:hover{background:#1ed760}
+  .spotify-presets{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+  .spotify-preset{display:flex;align-items:center;gap:8px;padding:6px 9px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:10px;cursor:pointer;transition:all .15s;text-decoration:none}
+  .spotify-preset:hover{border-color:#1db954;color:#1db954}
+  .spotify-preset.active{border-color:#1db954;color:#1db954;background:rgba(29,185,84,.07)}
+  .spotify-divider{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:4px 0 6px}
+  .spotify-input-row{display:flex;gap:5px}
   .spotify-url-input{flex:1;padding:6px 9px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:9px;outline:none}
   .spotify-url-input::placeholder{color:var(--text-dim)}
   .spotify-url-input:focus{border-color:#1db954}
   .spotify-load-btn{padding:6px 10px;background:#1db954;border:none;border-radius:6px;color:#000;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap}
   .spotify-load-btn:hover{background:#1ed760}
-  .spotify-presets{display:flex;flex-direction:column;gap:3px;margin-top:6px}
-  .spotify-preset{display:flex;align-items:center;gap:7px;padding:5px 8px;background:var(--surface3);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:10px;cursor:pointer;transition:all .15s}
-  .spotify-preset:hover{border-color:#1db954;color:#1db954}
 
   .right-col{display:flex;flex-direction:column;gap:10px}
 
@@ -359,14 +366,9 @@
 
     <div class="card fade-in">
       <div class="cal-nav">
-        <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8249;</button>
-        <span class="cal-month-label" id="cal-month"></span>
-        <button class="cal-nav-btn" onclick="changeMonth(1)">&#8250;</button>
-      </div>
-      <div class="cal-header">
-        <div class="cal-day-label">S</div><div class="cal-day-label">M</div><div class="cal-day-label">T</div>
-        <div class="cal-day-label">W</div><div class="cal-day-label">T</div><div class="cal-day-label">F</div>
-        <div class="cal-day-label">S</div>
+        <button class="cal-nav-btn" onclick="changeWeek(-1)">&#8249;</button>
+        <span class="cal-week-label" id="cal-week-label"></span>
+        <button class="cal-nav-btn" onclick="changeWeek(1)">&#8250;</button>
       </div>
       <div class="cal-grid" id="cal-grid"></div>
     </div>
@@ -376,18 +378,17 @@
   <div class="right-col">
     <div class="spotify-widget fade-in">
       <div class="card-title">Study Music</div>
-      <div class="spotify-embed-wrap" id="spotify-embed-wrap">
-        <iframe id="spotify-iframe" src="https://open.spotify.com/embed/playlist/0vvXsWCC9xrXsKd4eiptFQ?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+      <div class="spotify-presets" id="spotify-presets">
+        <a class="spotify-preset active" href="https://open.spotify.com/playlist/0vvXsWCC9xrXsKd4eiptFQ" target="_blank" onclick="setActive(this)">🎧 Lofi Girl — Study 24/7</a>
+        <a class="spotify-preset" href="https://open.spotify.com/playlist/37i9dQZF1DX8Uebhn9wzrS" target="_blank" onclick="setActive(this)">📻 Lofi Hip Hop Beats</a>
+        <a class="spotify-preset" href="https://open.spotify.com/playlist/37i9dQZF1DX9sIqqvKsjEK" target="_blank" onclick="setActive(this)">🌙 Late Night Studying</a>
+        <a class="spotify-preset" href="https://open.spotify.com/playlist/37i9dQZF1DWZZbwlv3Vmtr" target="_blank" onclick="setActive(this)">☕ Coffee Shop Ambience</a>
+        <a class="spotify-preset" href="https://open.spotify.com/playlist/37i9dQZF1DWZd79rJ6a7lp" target="_blank" onclick="setActive(this)">🌲 Nature Sounds Focus</a>
       </div>
-      <div class="spotify-presets">
-        <div class="spotify-preset" onclick="loadSpotify('playlist/0vvXsWCC9xrXsKd4eiptFQ')">🎧 Lofi Girl — Study 24/7</div>
-        <div class="spotify-preset" onclick="loadSpotify('playlist/37i9dQZF1DX8Uebhn9wzrS')">📻 Lofi Hip Hop Beats</div>
-        <div class="spotify-preset" onclick="loadSpotify('playlist/37i9dQZF1DX9sIqqvKsjEK')">🌙 Late Night Studying</div>
-        <div class="spotify-preset" onclick="loadSpotify('playlist/37i9dQZF1DWZZbwlv3Vmtr')">☕ Coffee Shop Ambience</div>
-      </div>
+      <div class="spotify-divider">or open your own</div>
       <div class="spotify-input-row">
-        <input class="spotify-url-input" id="spotify-url-input" placeholder="Paste Spotify playlist/album URL...">
-        <button class="spotify-load-btn" onclick="loadSpotifyFromInput()">Load</button>
+        <input class="spotify-url-input" id="spotify-url-input" placeholder="Paste any Spotify URL...">
+        <button class="spotify-load-btn" onclick="openSpotifyUrl()">Open</button>
       </div>
     </div>
 
@@ -575,52 +576,54 @@ function closeCourseModal(){
   activeCourse = null;
 }
 
-// ── CALENDAR ──
-let calDate = new Date();
+// ── CALENDAR (WEEK VIEW) ──
 const TASK_DATES = {
-  '2026-04-13': 'hw', '2026-04-15': 'hw', '2026-04-20': 'hw',
-  '2026-04-27': 'exam', '2026-04-28': 'exam', '2026-04-29': 'exam', '2026-05-01': 'exam'
+  '2026-04-13':'hw','2026-04-15':'hw','2026-04-20':'hw',
+  '2026-04-27':'exam','2026-04-28':'exam','2026-04-29':'exam','2026-05-01':'exam'
 };
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let weekStart = getWeekStart(new Date());
+
+function getWeekStart(d){
+  const dt = new Date(d); dt.setHours(0,0,0,0);
+  const day = dt.getDay();
+  dt.setDate(dt.getDate() - day);
+  return dt;
+}
+
 function renderCalendar(){
-  const y = calDate.getFullYear(), m = calDate.getMonth();
-  document.getElementById('cal-month').textContent = new Date(y,m,1).toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
-  const grid = document.getElementById('cal-grid');
   const today = new Date(); today.setHours(0,0,0,0);
-  const firstDay = new Date(y,m,1).getDay();
-  const daysInMonth = new Date(y,m+1,0).getDate();
-  const daysInPrev = new Date(y,m,0).getDate();
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate()+6);
+  const startLabel = weekStart.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+  const endLabel = weekEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+  document.getElementById('cal-week-label').textContent = startLabel+' – '+endLabel;
+  const grid = document.getElementById('cal-grid');
   let html = '';
-  for(let i=firstDay-1;i>=0;i--){
-    html += '<div class="cal-day other-month">'+(daysInPrev-i)+'</div>';
-  }
-  for(let d=1;d<=daysInMonth;d++){
-    const dateStr = y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    const dt = new Date(y,m,d);
+  for(let i=0;i<7;i++){
+    const dt = new Date(weekStart); dt.setDate(weekStart.getDate()+i);
+    const dateStr = dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
     const isToday = dt.getTime()===today.getTime();
     const taskType = TASK_DATES[dateStr];
-    let cls = 'cal-day';
-    if(isToday) cls+=' today';
-    if(taskType==='exam') cls+=' has-exam';
-    else if(taskType==='hw') cls+=' has-task';
-    html += '<div class="'+cls+'" title="'+dateStr+'">'+d+'</div>';
+    let numCls = 'cal-day-num'; if(isToday) numCls+=' today';
+    let dotHtml = '';
+    if(taskType==='exam') dotHtml='<span class="cal-dot exam"></span>';
+    else if(taskType==='hw') dotHtml='<span class="cal-dot hw"></span>';
+    html += '<div class="cal-day-col"><div class="cal-day-name">'+DAY_NAMES[dt.getDay()]+'</div><div class="'+numCls+'">'+dt.getDate()+dotHtml+'</div></div>';
   }
-  const remaining = 42-(firstDay+daysInMonth);
-  for(let d=1;d<=remaining;d++) html += '<div class="cal-day other-month">'+d+'</div>';
   grid.innerHTML = html;
 }
-function changeMonth(dir){ calDate.setMonth(calDate.getMonth()+dir); renderCalendar(); }
+function changeWeek(dir){ weekStart.setDate(weekStart.getDate()+(dir*7)); renderCalendar(); }
 renderCalendar();
 
 // ── SPOTIFY ──
-function loadSpotify(path){
-  const src = 'https://open.spotify.com/embed/'+path+'?utm_source=generator&theme=0';
-  document.getElementById('spotify-iframe').src = src;
+function setActive(el){
+  document.querySelectorAll('.spotify-preset').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
 }
-function loadSpotifyFromInput(){
+function openSpotifyUrl(){
   const raw = document.getElementById('spotify-url-input').value.trim();
-  const match = raw.match(/spotify\.com\/(playlist|album|track|artist)\/([a-zA-Z0-9]+)/);
-  if(match){ loadSpotify(match[1]+'/'+match[2]); document.getElementById('spotify-url-input').value=''; }
-  else { alert('Paste a valid Spotify URL (playlist, album, track, or artist)'); }
+  if(raw.includes('spotify.com')){ window.open(raw,'_blank'); document.getElementById('spotify-url-input').value=''; }
+  else { alert('Paste a valid Spotify URL'); }
 }
 
 // ── STREAK ──
