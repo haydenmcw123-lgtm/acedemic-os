@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   SwingLab — broadcast golf telemetry
+   Base green IS the dark theme. There is no light mode by design.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  /* Surfaces */
+  --color-fairway: #0b2e1f;
+  --color-fairway-deep: #072016;
+  --color-fairway-lift: #103726;
+
+  /* Ink */
+  --color-bone: #f4f3ee;
+  --color-bone-70: rgba(244, 243, 238, 0.7);
+  --color-bone-45: rgba(244, 243, 238, 0.45);
+  --color-bone-25: rgba(244, 243, 238, 0.25);
+
+  /* Rules — thin, white, low opacity */
+  --color-rule: rgba(244, 243, 238, 0.16);
+  --color-rule-strong: rgba(244, 243, 238, 0.34);
+
+  /* The single accent. Reserved for the user's own value. */
+  --color-lab: #e8c547;
+
+  /* Tour range band — muted gray-green, never competes with the accent */
+  --color-band: #6e8577;
+
+  /* Out-of-range only. Never decorative. */
+  --color-flag: #c1444a;
+
+  --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+
+  /* Nothing in this app is rounded. */
+  --radius-none: 0px;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-fairway);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-fairway);
+    color: var(--color-bone);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    /* One-handed: keep the whole thing in the thumb arc, never sideways. */
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  /* Numbers are the hero. */
+  .num {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.02em;
+    line-height: 0.88;
+  }
+
+  ::selection {
+    background: var(--color-lab);
+    color: var(--color-fairway);
+  }
+
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  label:focus-within {
+    outline: 1px solid var(--color-lab);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Eyebrow / field labels — condensed, wide, quiet. */
+  .eyebrow {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-bone-45);
+  }
+
+  .heading {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  /* A hairline that spans the gutter-to-gutter width. */
+  .rule {
+    border: 0;
+    border-top: 1px solid var(--color-rule);
+  }
+}
+
+/* Indeterminate progress sweep — the only motion in the app. */
+@keyframes swipe {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
