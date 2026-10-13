@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bluff House</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" />
+  <link rel="stylesheet" href="/src/ui/style.css" />
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="hud" aria-live="polite">
+    <div class="eyebrow" id="hudLevel">Main Level</div>
+    <div class="name" id="hudRoom">Bluff House</div>
+    <div class="meta" id="hudMeta">Stage 1 · clay</div>
+  </div>
+  <div id="help">
+    <span><kbd>Click</kbd> walk</span><span><kbd>WASD</kbd> move</span><span><kbd>Shift</kbd> sprint</span>
+    <span><kbd>V</kbd> roof</span><span><kbd>C</kbd> collider</span><span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> jump to level</span>
+    <span id="fps"></span>
+  </div>
+  <div id="loader"><div class="bar"><i id="loaderBar"></i></div></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
