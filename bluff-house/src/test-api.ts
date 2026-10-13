@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { BuiltHouse } from './build/house';
 import { levelOfFeet } from './data/house';
 import { PLAYER, type MoveInput, type PlayerController } from './player/controller';
@@ -9,6 +10,8 @@ import type { RoomLabels } from './ui/labels';
 import type { Measure } from './ui/measure';
 import { whereAt } from './ui/where';
 import type { LevelCuller } from './render/culling';
+import type { Post, ToneMap } from './render/post';
+import type { InteriorLights } from './lighting/interior';
 import { renderLevelAerial, renderPlan, windowFromViewBox } from './render/planview';
 import type { RenderRig } from './render/renderer';
 
@@ -24,6 +27,9 @@ interface Deps {
   labels: RoomLabels;
   measure: Measure;
   step: (dt: number) => void;
+  post: Post;
+  interior: InteriorLights;
+  renderSettled: () => void;
   squareFootage: { byLevel: number[]; heated: number; garage: number };
 }
 
@@ -33,6 +39,11 @@ interface Deps {
  */
 export function installTestApi(d: Deps) {
   const { rig, built, player } = d;
+  const setSize = (w: number, h: number) => {
+    rig.renderer.setPixelRatio(1);
+    rig.renderer.setSize(w, h, false); rig.camera.aspect = w / h; rig.camera.updateProjectionMatrix();
+    d.post.setSize(w, h);
+  };
   const state = () => {
     const L = levelOfFeet(player.feet);
     const room = built.plan.roomAt(L, player.x, player.z);
@@ -92,10 +103,9 @@ export function installTestApi(d: Deps) {
       player.teleport(x, z, feet); player.yaw = yaw; player.pitch = pitch;
       for (const p of built.ctx.dynamic) for (let i = 0; i < 60; i++) p.update(player.x, player.z, player.feet, 1 / 30);
       d.culler.update(player.x, player.z, player.feet);
-      rig.renderer.setSize(w, h, false); rig.camera.aspect = w / h; rig.camera.updateProjectionMatrix();
+      setSize(w, h);
       player.applyCamera(rig.camera);
-      rig.renderer.shadowMap.needsUpdate = true;
-      rig.renderer.render(rig.scene, rig.camera);
+      d.renderSettled();
       return rig.renderer.domElement.toDataURL('image/png');
     },
     /**
@@ -167,12 +177,56 @@ export function installTestApi(d: Deps) {
     },
     /** Renders the current camera view (for screenshots of the UI-free scene). */
     shot(w = 1280, h = 800) {
-      rig.renderer.setSize(w, h, false); rig.camera.aspect = w / h; rig.camera.updateProjectionMatrix();
+      setSize(w, h);
       d.labels.update(rig.camera, player.feet, 1);
       d.measure.update(rig.camera);
-      rig.renderer.shadowMap.needsUpdate = true;
-      rig.renderer.render(rig.scene, rig.camera);
+      d.renderSettled();
       return rig.renderer.domElement.toDataURL('image/png');
+    },
+    setToneMap: (t: ToneMap) => d.post.setToneMap(t),
+    /** 0 = normal, 1 = AO only, 2 = no AO (debug views). */
+    aoMode: (m: number) => { d.post.ao.configuration.renderMode = m === 2 ? 0 : m; d.post.ao.enabled = m !== 2; },
+    lightCounts: () => d.interior.counts,
+    /**
+     * Renders a fixed view at a given clock time and returns the image plus a health check:
+     * pure-black pixels (NaN / bloom black squares), clipped pixels (blown highlights), mean luminance.
+     */
+    photo(x: number, z: number, feet: number, yaw: number, pitch: number, hour: number, w = 1280, h = 720) {
+      d.director.pause();
+      player.teleport(x, z, feet); player.yaw = yaw; player.pitch = pitch;
+      for (const p of built.ctx.dynamic) for (let i = 0; i < 60; i++) p.update(player.x, player.z, player.feet, 1 / 30);
+      d.culler.update(player.x, player.z, player.feet);
+      d.time.set(hour);
+      setSize(w, h);
+      player.applyCamera(rig.camera);
+      d.renderSettled();
+      const gl = rig.renderer.getContext();
+      const px = new Uint8Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      let black = 0, clipped = 0, lum = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const r = px[i], g = px[i + 1], b = px[i + 2];
+        if (r + g + b === 0) black++; // true black only: NaN / bloom black squares
+        if (r >= 252 && g >= 252 && b >= 252) clipped++;
+        lum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+      const n = w * h;
+      const url = rig.renderer.domElement.toDataURL('image/png');
+      // the root cause of bloom "black squares" is Inf/NaN in the HDR scene buffer: count them exactly
+      const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType });
+      rig.renderer.setRenderTarget(rt);
+      // the same pass also counts the scene's draw calls (post-processing passes not included)
+      rig.renderer.info.autoReset = false; rig.renderer.info.reset();
+      rig.renderer.render(rig.scene, rig.camera);
+      const calls = rig.renderer.info.render.calls, tris = rig.renderer.info.render.triangles;
+      rig.renderer.info.autoReset = true;
+      const hdr = new Uint16Array(w * h * 4);
+      rig.renderer.readRenderTargetPixels(rt, 0, 0, w, h, hdr);
+      rig.renderer.setRenderTarget(null);
+      rt.dispose();
+      let nanInf = 0;
+      for (let i = 0; i < hdr.length; i += 4) if ((hdr[i] & 0x7c00) === 0x7c00 || (hdr[i + 1] & 0x7c00) === 0x7c00 || (hdr[i + 2] & 0x7c00) === 0x7c00) nanInf++;
+      return { url, black: black / n, clipped: clipped / n, nanInf, meanLum: lum / n / 255, exposure: d.time.exposure, sunEl: d.time.sun.elevation, calls, tris };
     },
     info() { return { calls: rig.renderer.info.render.calls, tris: rig.renderer.info.render.triangles }; },
     /** Runs level culling for the current position and reports which interior groups are drawn. */

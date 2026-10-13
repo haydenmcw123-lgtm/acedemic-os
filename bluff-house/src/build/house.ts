@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import type { HouseData } from '../data/types';
 import { material } from '../materials/library';
+
+/** Interior groups get the interior material variant (less sky reflection until Stage 5). */
+const matFor = (key: string, group: GroupKey) => material(key, group === 'shell' || group === 'site' ? 'ext' : 'int');
 import { makeContext, type BuildContext } from './context';
 import { buildExterior, siteCuts } from './exterior';
 import { buildFloors } from './floors';
@@ -47,8 +50,8 @@ export function buildHouse(data: HouseData): BuiltHouse {
   const terrain = buildTerrain(ctx, siteCuts(ctx));
   buildExterior(ctx, terrain.height);
 
-  const groups = ctx.geo.build(material);
-  const roofGroups = roofCtx.geo.build(material);
+  const groups = ctx.geo.build(matFor);
+  const roofGroups = roofCtx.geo.build(matFor);
   const roof = new THREE.Group(); roof.name = 'roof';
   for (const g of roofGroups.values()) for (const m of [...g.children]) roof.add(m);
 
@@ -58,7 +61,7 @@ export function buildHouse(data: HouseData): BuiltHouse {
 
   // terrain
   if (ctx.terrainGeometry) {
-    const t = new THREE.Mesh(ctx.terrainGeometry, material('terrain'));
+    const t = new THREE.Mesh(ctx.terrainGeometry, material('terrain', 'ext'));
     t.name = 'terrain'; t.receiveShadow = true; t.castShadow = false;
     groups.get('site')!.add(t);
     // terrain goes into the collider as plain triangles
@@ -71,7 +74,7 @@ export function buildHouse(data: HouseData): BuiltHouse {
 
   // moving parts (the bookcase door)
   for (const d of ctx.dynamic) {
-    d.object.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = material(o.userData.matKey); });
+    d.object.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = material(o.userData.matKey, 'int'); });
     groups.get('L2i')!.add(d.object);
   }
 

@@ -91,12 +91,15 @@ export function renderLevelAerial(house: BuiltHouse, rig: RenderRig, level: numb
  * above the cut would still shade the level. Use shadowless key + fill light instead.
  */
 function flatLights(rig: RenderRig): () => void {
+  const sky = rig.scene.getObjectByName('sky');
+  const skyVis = sky?.visible ?? false;
+  if (sky) sky.visible = false;
   const key = new THREE.DirectionalLight(0xffffff, 1.5);
   key.position.set(-60, 120, 140); key.target.position.set(35, 0, 45);
   rig.scene.add(key, key.target);
   const prevSun = rig.sun.intensity, prevHemi = rig.hemi.intensity;
   rig.sun.intensity = 0; rig.hemi.intensity = 2.0;
-  return () => { rig.scene.remove(key, key.target); rig.sun.intensity = prevSun; rig.hemi.intensity = prevHemi; };
+  return () => { rig.scene.remove(key, key.target); rig.sun.intensity = prevSun; rig.hemi.intensity = prevHemi; if (sky) sky.visible = skyVis; };
 }
 
 /** Flat caps where a horizontal cut at height `cut` passes through the walls of `level`. */

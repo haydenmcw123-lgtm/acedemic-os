@@ -24,7 +24,8 @@ export function buildFloors(ctx: BuildContext, stair: StairLayout) {
       ctx.col.floor(x0, z0, x1, z1, y);
     }
     if (!R.noCeil) {
-      const cy = y + CEIL_H[L];
+      // a hair below the roof slab's underside, which sits at exactly the ceiling height (no z-fighting)
+      const cy = y + CEIL_H[L] - 0.04;
       for (const [x0, z0, x1, z1] of R.rects) ctx.geo.quad(grp, 'ceil', [x0, cy, z0], [x1, cy, z0], [x1, cy, z1], [x0, cy, z1]);
     }
   });

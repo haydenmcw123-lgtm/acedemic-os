@@ -109,7 +109,7 @@ export class GeoBuilder {
   }
 
   /** Builds one mesh per (group, material) bucket. */
-  build(materialFor: (key: string) => THREE.Material): Map<GroupKey, THREE.Group> {
+  build(materialFor: (key: string, group: GroupKey) => THREE.Material): Map<GroupKey, THREE.Group> {
     const groups = new Map<GroupKey, THREE.Group>();
     for (const k of GROUP_KEYS) { const g = new THREE.Group(); g.name = k; groups.set(k, g); }
     for (const b of this.buckets.values()) {
@@ -118,9 +118,10 @@ export class GeoBuilder {
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.nrm, 3));
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
       geo.computeBoundingSphere();
-      const m = new THREE.Mesh(geo, materialFor(b.mat));
+      const mat = materialFor(b.mat, b.group);
+      const m = new THREE.Mesh(geo, mat);
       m.name = b.group + ':' + b.mat;
-      m.castShadow = b.castShadow; m.receiveShadow = true;
+      m.castShadow = b.castShadow && mat.userData.castShadow !== false; m.receiveShadow = true;
       m.userData.mat = b.mat;
       groups.get(b.group)!.add(m);
     }
