@@ -16,11 +16,11 @@ export function railing(ctx: BuildContext, axis: 'x' | 'z', at: number, s: numbe
   box(s - 0.05, e + 0.05, y + h - 0.12, y + h + 0.04, 0.16, 'walnut');
   const min: V3 = axis === 'x' ? [at - 0.25, y, s] : [s, y, at - 0.25];
   const max: V3 = axis === 'x' ? [at + 0.25, y + h + 0.2, e] : [e, y + h + 0.2, at + 0.25];
-  ctx.col.box(min, max);
+  ctx.col.transparent(() => ctx.col.box(min, max));
 }
 
 /** Vertical glass panel whose top follows a profile (used for the stair guards). Points are (t, yTop) along the run. */
-export function glassGuardProfile(ctx: BuildContext, axis: 'x' | 'z', at: number, yBottom: number, profile: [number, number][], group: GroupKey) {
+export function glassGuardProfile(ctx: BuildContext, axis: 'x' | 'z', at: number, yBottom: number, profile: [number, number][], group: GroupKey, cap = true) {
   const g = ctx.geo;
   const half = 0.03;
   const P = (t: number, y: number, n: number): V3 => (axis === 'x' ? [at + n, y, t] : [t, y, at + n]);
@@ -29,11 +29,12 @@ export function glassGuardProfile(ctx: BuildContext, axis: 'x' | 'z', at: number
     // two faces of the pane
     for (const n of [-half, half]) {
       const front = (n > 0) === (axis === 'x');
-      const q: V3[] = [P(t0, yBottom, n), P(t1, yBottom, n), P(t1, y1 - 0.12, n), P(t0, y0 - 0.12, n)];
+      const inset = cap ? 0.12 : 0;
+      const q: V3[] = [P(t0, yBottom, n), P(t1, yBottom, n), P(t1, y1 - inset, n), P(t0, y0 - inset, n)];
       if (front) g.quad(group, 'glass', q[1], q[0], q[3], q[2], false); else g.quad(group, 'glass', q[0], q[1], q[2], q[3], false);
     }
     // walnut cap rail following the top
-    g.beam(P(t0, y0 - 0.04, 0), P(t1, y1 - 0.04, 0), 0.32, 0.16, 'walnut', group);
+    if (cap) g.beam(P(t0, y0 - 0.04, 0), P(t1, y1 - 0.04, 0), 0.32, 0.16, 'walnut', group);
     // collision: a slab under the profile, split into short vertical boxes
     const n = Math.max(1, Math.ceil(Math.abs(t1 - t0) / 0.5));
     for (let k = 0; k < n; k++) {
@@ -42,7 +43,7 @@ export function glassGuardProfile(ctx: BuildContext, axis: 'x' | 'z', at: number
       const lo = Math.min(a, b), hi = Math.max(a, b);
       const min: V3 = axis === 'x' ? [at - 0.25, yBottom, lo] : [lo, yBottom, at - 0.25];
       const max: V3 = axis === 'x' ? [at + 0.25, yt, hi] : [hi, yt, at + 0.25];
-      ctx.col.box(min, max);
+      ctx.col.transparent(() => ctx.col.box(min, max));
     }
   }
 }

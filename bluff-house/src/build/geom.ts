@@ -147,8 +147,15 @@ function worldUV(p: V3, nx: number, ny: number, nz: number): [number, number] {
  */
 export class ColliderBuilder {
   readonly pos: number[] = [];
+  /** Per triangle: 1 if it blocks sight (walls, floors, terrain), 0 for glass and rails. */
+  readonly opaque: number[] = [];
+  /** Set false while adding see-through colliders. */
+  seeThrough = false;
 
-  tri(a: V3, b: V3, c: V3) { this.pos.push(...a, ...b, ...c); }
+  tri(a: V3, b: V3, c: V3) { this.pos.push(...a, ...b, ...c); this.opaque.push(this.seeThrough ? 0 : 1); }
+
+  /** Adds colliders inside `fn` as see-through (glass, rails): they block walking but not sight lines. */
+  transparent(fn: () => void) { const prev = this.seeThrough; this.seeThrough = true; try { fn(); } finally { this.seeThrough = prev; } }
   quad(a: V3, b: V3, c: V3, d: V3) { this.tri(a, b, c); this.tri(a, c, d); }
 
   box(min: V3, max: V3) {

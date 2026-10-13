@@ -19,6 +19,8 @@ export interface BuiltHouse {
   ceilings: THREE.Mesh[];
   collider: THREE.Mesh;
   bvh: MeshBVH;
+  /** Per collider triangle: 1 blocks sight lines, 0 is glass or a rail. */
+  opaque: Uint8Array;
   ctx: BuildContext;
   plan: Plan;
   stair: StairLayout;
@@ -84,7 +86,7 @@ export function buildHouse(data: HouseData): BuiltHouse {
 
   const st = ctx.geo.stats();
   return {
-    root, groups, roof, ceilings, collider, bvh, ctx, plan, stair, terrain,
+    root, groups, roof, ceilings, collider, bvh, opaque: Uint8Array.from(ctx.col.opaque), ctx, plan, stair, terrain,
     stats: { tris: st.tris + roofCtx.geo.stats().tris, buckets: st.buckets, colliderTris: ctx.col.pos.length / 9, ms: performance.now() - t0 },
   };
 }

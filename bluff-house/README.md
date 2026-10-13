@@ -4,8 +4,8 @@ A browser walkthrough of a 7,224 sq ft lake house above Lake Lure, NC. The whole
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:5173  (click to walk: WASD, Shift sprint, V roof, C collider, 1/2/3 levels)
-pnpm test         # Playwright: plan alignment, collisions, clay views → proof/
+pnpm dev          # http://localhost:5173 — the guided tour starts on its own; Space walk · R resume · L sizes · M measure · T time · H help
+pnpm test         # Playwright: plan alignment, collisions, full tour sim, UI → proof/
 pnpm build        # production bundle in dist/
 ```
 

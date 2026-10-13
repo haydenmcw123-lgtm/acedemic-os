@@ -97,8 +97,12 @@ export function buildStairs(ctx: BuildContext, lay: StairLayout) {
 
   // Glass guards along the open sides of the well, one continuous panel per edge from the
   // lowest floor to 42" above the top floor, so there is never a gap to fall through.
+  // Beside the foot of flight A the treads are under a foot high, so the glass can start 1 ft into
+  // the flight there (it keeps the turn onto the stair clear); on the top floor the well is open to
+  // the full height, so that level's guard runs the whole length.
   const yTop = FLOOR_Y[2] + 3.5;
-  glassGuardProfile(ctx, 'x', runA.x0, FLOOR_Y[0], [[runA.z0, yTop], [runA.z1, yTop]], grp);
+  glassGuardProfile(ctx, 'x', runA.x0, FLOOR_Y[0], [[runA.z0 + 1, FLOOR_Y[2]], [runA.z1, FLOOR_Y[2]]], grp, false);
+  glassGuardProfile(ctx, 'x', runA.x0, FLOOR_Y[2], [[runA.z0, yTop], [runA.z1, yTop]], grp);
   glassGuardProfile(ctx, 'z', runB.z0, FLOOR_Y[0], [[runB.x0, yTop], [runB.x1, yTop]], grp);
   // top level: guard across the head of flight A
   glassGuardProfile(ctx, 'z', runA.z0, FLOOR_Y[2], [[runA.x0, yTop], [runA.x1, yTop]], grp);

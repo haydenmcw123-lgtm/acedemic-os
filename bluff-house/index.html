@@ -10,17 +10,16 @@
 </head>
 <body>
   <div id="stage"></div>
+  <div id="labels"></div>
+  <div id="cross"></div>
   <div id="hud" aria-live="polite">
-    <div class="eyebrow" id="hudLevel">Main Level</div>
+    <div class="eyebrow" id="hudLevel">Arrival</div>
     <div class="name" id="hudRoom">Bluff House</div>
-    <div class="meta" id="hudMeta">Stage 1 · clay</div>
+    <div class="meta" id="hudMeta">Lake Lure, North Carolina</div>
   </div>
-  <div id="help">
-    <span><kbd>Click</kbd> walk</span><span><kbd>WASD</kbd> move</span><span><kbd>Shift</kbd> sprint</span>
-    <span><kbd>V</kbd> roof</span><span><kbd>C</kbd> collider</span><span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> jump to level</span>
-    <span id="fps"></span>
-  </div>
-  <div id="loader"><div class="bar"><i id="loaderBar"></i></div></div>
+  <div id="chip"><i></i><span id="chipText">Guided tour</span><span id="fps"></span></div>
+  <div id="hkey"><kbd>H</kbd> shortcuts</div>
+  <div id="loader"><div class="box"><div class="t">Bluff House</div><div class="bar"><i id="loaderBar"></i></div><div class="msg" id="loaderMsg">Framing three levels…</div></div></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

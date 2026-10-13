@@ -162,7 +162,7 @@ export function buildExterior(ctx: BuildContext, groundAt: (x: number, z: number
         const ta = k / segs, tb = (k + 1) / segs;
         const xa = A[0] + (B[0] - A[0]) * ta, xb = A[0] + (B[0] - A[0]) * tb, za = A[2] + (B[2] - A[2]) * ta, zb = A[2] + (B[2] - A[2]) * tb;
         const ya = Math.min(A[1] + (B[1] - A[1]) * ta, A[1] + (B[1] - A[1]) * tb);
-        col.box([Math.min(xa, xb) - 0.15, ya - 1, Math.min(za, zb) - 0.15], [Math.max(xa, xb) + 0.15, ya + 4, Math.max(za, zb) + 0.15]);
+        col.transparent(() => col.box([Math.min(xa, xb) - 0.15, ya - 1, Math.min(za, zb) - 0.15], [Math.max(xa, xb) + 0.15, ya + 4, Math.max(za, zb) + 0.15]));
       }
     }
   }

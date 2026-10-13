@@ -66,7 +66,7 @@ export function dressOpening(ctx: BuildContext, o: Opening, a: number, b: number
       frame(a, b, y0, y1, bottom);
       mullions(a, b, y0, y1, 4);
       pane(a + FW, b - FW, y0 + (bottom ? FW : 0), y1 - FW);
-      lcol(a, b, y0, y1, -0.15, 0.15);
+      ctx.col.transparent(() => lcol(a, b, y0, y1, -0.15, 0.15));
       if ((o.sill ?? 0) > 1.5) {
         // interior stool on the room side
         const n = ib >= 0 ? 1 : -1;
@@ -84,7 +84,7 @@ export function dressOpening(ctx: BuildContext, o: Opening, a: number, b: number
         lbox(t1 - FW, t1, y0, y1 - FW, n - 0.06, n + 0.06, 'steel');
         pane(t0 + FW, t1 - FW, y0 + FW, y1 - FW, n);
       }
-      lcol(b - pw - 0.1, b, y0, y1, -0.3, 0.3);
+      ctx.col.transparent(() => lcol(b - pw - 0.1, b, y0, y1, -0.3, 0.3));
       break;
     }
     case 'fold': {
@@ -101,7 +101,7 @@ export function dressOpening(ctx: BuildContext, o: Opening, a: number, b: number
         g.orientedBox(cx, cz, y0 + 0.02, y0 + 0.14, pw / 2, 0.06, rot, 'steel', 'shell');
       }
       const s0 = b - 0.25 - n * 0.3 - 0.1;
-      lcol(s0, b, y0, y1, outSide > 0 ? T2 : -(T2 + pw + 0.2), outSide > 0 ? T2 + pw + 0.2 : -T2);
+      ctx.col.transparent(() => lcol(s0, b, y0, y1, outSide > 0 ? T2 : -(T2 + pw + 0.2), outSide > 0 ? T2 + pw + 0.2 : -T2));
       break;
     }
     case 'glassdoor': {
@@ -114,7 +114,7 @@ export function dressOpening(ctx: BuildContext, o: Opening, a: number, b: number
       const [px, pz] = world(a + 0.12, into * (T2 + len - 0.4));
       g.orientedBox(px, pz, y0 + 3.2, y0 + 4.2, 0.04, 0.04, 0, 'brass', grp);
       const c0 = into > 0 ? T2 : -(T2 + len), c1 = into > 0 ? T2 + len : -T2;
-      lcol(a, a + 0.25, y0, y1, c0, c1);
+      ctx.col.transparent(() => lcol(a, a + 0.25, y0, y1, c0, c1));
       break;
     }
     case 'door':
@@ -175,7 +175,7 @@ export function dressOpening(ctx: BuildContext, o: Opening, a: number, b: number
  * swinging into the room on side a. Rests ajar; opens wide when the player is near.
  */
 function bookcaseDoor(ctx: BuildContext, o: Opening, a: number, b: number, y0: number, y1: number, ia: number) {
-  const depth = 0.83, len = b - a - 0.08, hgt = y1 - y0 - 0.06;
+  const depth = 0.67, len = b - a - 0.08, hgt = y1 - y0 - 0.06; // 8" shelves leave a 2.3-ft clear passage
   const into = ia >= 0 ? -1 : 1; // the Study is on side a
   const up = new THREE.Vector3(0, 1, 0);
   const tDir = o.axis === 'x' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
@@ -224,9 +224,9 @@ function bookcaseDoor(ctx: BuildContext, o: Opening, a: number, b: number, y0: n
     blocker,
     update(x, z, feet, dt) {
       const dist = Math.abs(feet - y0) < 6 ? Math.hypot(x - ox, z - oz) : 99;
-      const k = 1 - THREE.MathUtils.smoothstep(dist, 5.5, 9.5);
+      const k = 1 - THREE.MathUtils.smoothstep(dist, 6, 12);
       const target = BOOKCASE_REST_DEG + (BOOKCASE_OPEN_DEG - BOOKCASE_REST_DEG) * k;
-      angle += (target - angle) * Math.min(1, dt * 4);
+      angle += (target - angle) * Math.min(1, dt * 6);
       apply();
     },
   });

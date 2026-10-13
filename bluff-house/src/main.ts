@@ -1,22 +1,31 @@
 import * as THREE from 'three';
 import { buildHouse } from './build/house';
-import { FLOOR_Y, house, LEVELS, levelOfFeet, squareFootage, validateHouse } from './data/house';
+import { FLOOR_Y, house, squareFootage, validateHouse } from './data/house';
+import { fmtClock } from './lighting/sun';
+import { DAY, TimeOfDay } from './lighting/timeofday';
 import { PlayerController } from './player/controller';
+import { Director } from './player/director';
 import { Input } from './player/input';
+import { Tour } from './player/tour';
 import { LevelCuller } from './render/culling';
 import { createRenderer } from './render/renderer';
 import { installTestApi } from './test-api';
+import { Caption } from './ui/caption';
+import { Dock, type Quality } from './ui/dock';
+import { RoomLabels } from './ui/labels';
+import { Measure } from './ui/measure';
+import { whereAt } from './ui/where';
 
 const TEST = new URLSearchParams(location.search).has('test');
 
 const errs = validateHouse(house);
 if (errs.length) console.error('house-data.json problems:\n' + errs.join('\n'));
-
 const sf = squareFootage(house);
 console.info(
   `Bluff House · lower ${sf.byLevel[0].toLocaleString()} / main ${sf.byLevel[1].toLocaleString()} / upper ${sf.byLevel[2].toLocaleString()}` +
   ` = ${sf.heated.toLocaleString()} heated sq ft (+ ${sf.garage.toLocaleString()} garage)`,
 );
+console.info(`Sun on ${house.location.date}: sunrise ${fmtClock(DAY.sunrise)}, solar noon ${fmtClock(DAY.solarNoon)}, sunset ${fmtClock(DAY.sunset)} (EDT)`);
 
 const rig = createRenderer(document.getElementById('stage')!, TEST);
 const built = buildHouse(house);
@@ -29,62 +38,114 @@ rig.scene.add(built.root, built.collider);
 }
 
 const player = new PlayerController(built.bvh, built.ctx.dynamic.map((d) => d.blocker));
-const start = house.tourStops[0];
-player.teleport(start.x, start.z, FLOOR_Y[1]);
-player.yaw = Math.PI / 2; // face west, toward the front doors
+const tour = new Tour(house.tourStops);
+const director = new Director(player, tour);
 const culler = new LevelCuller(built.groups, built.plan);
 const input = new Input(rig.renderer.domElement);
+const time = new TimeOfDay(rig);
+const caption = new Caption();
+const labels = new RoomLabels(built.bvh, built.opaque);
+const measure = new Measure(rig.scene, built.bvh);
 
-// ---- debug toggles ----
+// ---- quality (adaptive "Auto" arrives in Stage 6; until then it equals High) ----
+function setQuality(q: Quality) {
+  const ratio = { auto: 1, high: 1, medium: 0.85, low: 0.75 }[q];
+  rig.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5) * ratio);
+  const sm = { auto: 4096, high: 4096, medium: 2048, low: 1024 }[q];
+  if (rig.sun.shadow.mapSize.x !== sm) {
+    rig.sun.shadow.mapSize.set(sm, sm);
+    rig.sun.shadow.map?.dispose(); rig.sun.shadow.map = null;
+    rig.renderer.shadowMap.needsUpdate = true;
+  }
+  rig.resize();
+  dock.setQuality(q);
+}
+
+// ---- UI ----
+const chip = document.getElementById('chip')!, chipText = document.getElementById('chipText')!;
+const dock = new Dock({
+  onTour: () => director.toggle(),
+  onTime: (h) => time.set(h),
+  onSizes: () => dock.setSizes(labels.toggle()),
+  onMeasure: () => toggleMeasure(),
+  onFurnished: () => dock.toast('Furniture arrives in Stage 4'),
+  onQuality: (q) => setQuality(q),
+});
+function toggleMeasure() {
+  const on = measure.toggle();
+  dock.setMeasure(on);
+  if (on) { director.pause(); dock.toast(input.locked ? 'Measure: click two points (crosshair)' : 'Measure: click two points · Esc cancels'); }
+}
+director.onModeChange = (m) => {
+  dock.setTour(m === 'tour');
+  chip.classList.toggle('walk', m === 'walk');
+  chipText.textContent = m === 'tour' ? 'Guided tour' : 'Free walk';
+};
+director.onTourDone = () => dock.toast('Tour complete · walk freely, or press R to go again', 4000);
+time.onChange = (h) => dock.setTime(h);
+director.onModeChange(director.mode);
+
+input.on('Space', () => { if (measure.on) toggleMeasure(); director.toggle(); });
+input.on('KeyR', () => director.resume());
+input.on('KeyL', () => dock.setSizes(labels.toggle()));
+input.on('KeyM', toggleMeasure);
+input.on('KeyF', () => dock.toast('Furniture arrives in Stage 4'));
+input.on('KeyT', () => time.nextPreset());
+input.on('KeyH', () => dock.toggleHint());
+input.on('Escape', () => { if (measure.on) toggleMeasure(); });
+input.onUnlock = () => { if (measure.on) measure.cancel(); };
+input.onCanvasClick = (nx, ny) => {
+  if (measure.on) { measure.click(rig.camera, nx, ny); return true; }
+  director.pause(); // clicking the view takes over: free walk from here
+  return false;
+};
+input.onMouseMove = (nx, ny) => measure.move(rig.camera, nx, ny);
+// debug
 input.on('KeyV', () => { built.roof.visible = !built.roof.visible; rig.renderer.shadowMap.needsUpdate = true; });
 input.on('KeyC', () => { built.collider.visible = !built.collider.visible; });
 const jump: [number, number, number][] = [[21, 23, FLOOR_Y[0]], [13, 33, FLOOR_Y[1]], [28, 19.6, FLOOR_Y[2]]];
-(['Digit1', 'Digit2', 'Digit3'] as const).forEach((k, i) => input.on(k, () => player.teleport(jump[i][0], jump[i][1], jump[i][2])));
+(['Digit1', 'Digit2', 'Digit3'] as const).forEach((k, i) => input.on(k, () => { director.pause(); player.teleport(jump[i][0], jump[i][1], jump[i][2]); }));
 
-// ---- HUD ----
-const hudLevel = document.getElementById('hudLevel')!, hudRoom = document.getElementById('hudRoom')!, hudMeta = document.getElementById('hudMeta')!;
-const fpsEl = document.getElementById('fps')!;
-let lastRoom = '';
-function updateHud() {
-  const L = levelOfFeet(player.feet);
-  const room = built.plan.roomAt(L, player.x, player.z);
-  const key = room ? room.id : 'out';
-  if (key === lastRoom) return;
-  lastRoom = key;
-  hudLevel.textContent = room ? LEVELS[L].name : 'Outdoors';
-  hudRoom.textContent = room ? room.name : 'The Grounds';
-  hudMeta.textContent = room?.meta ?? (room ? `${room.rects[0][2] - room.rects[0][0]}′ × ${room.rects[0][3] - room.rects[0][1]}′` : 'Lake Lure, North Carolina');
+/** One simulation + presentation step. Shared by the render loop and the test driver. */
+function step(dt: number) {
+  input.update();
+  if (director.mode === 'tour' && input.moving) director.pause();
+  const look = input.consumeLook();
+  director.update(dt, input.move, look);
+  for (const d of built.ctx.dynamic) d.update(player.x, player.z, player.feet, dt);
+  culler.update(player.x, player.z, player.feet);
+  time.tick(dt);
+  director.apply(rig.camera);
+  caption.update(whereAt(built.plan, player.x, player.z, player.feet), dt);
 }
 
 // ---- loop ----
 const timer = new THREE.Timer();
+const fpsEl = document.getElementById('fps')!;
 let frameMs = 16, fpsT = 0;
 function frame(now: number) {
   timer.update(now);
   const dt = Math.min(0.05, timer.getDelta());
-  input.update();
-  const [mx, my] = input.consumeLook();
-  player.yaw -= mx * 0.0022;
-  player.pitch = THREE.MathUtils.clamp(player.pitch - my * 0.0022, -1.35, 1.35);
-  player.step(dt, input.move);
-  for (const d of built.ctx.dynamic) d.update(player.x, player.z, player.feet, dt);
-  culler.update(player.x, player.z, player.feet);
-  player.applyCamera(rig.camera);
-  updateHud();
+  step(dt);
+  labels.update(rig.camera, player.feet, dt);
+  measure.update(rig.camera);
   rig.renderer.render(rig.scene, rig.camera);
   frameMs = frameMs * 0.95 + dt * 1000 * 0.05;
   fpsT += dt;
-  if (fpsT > 0.5) { fpsT = 0; fpsEl.textContent = `${(1000 / frameMs).toFixed(0)} fps · ${rig.renderer.info.render.calls} calls`; }
+  if (fpsT > 0.5) { fpsT = 0; fpsEl.textContent = `${(1000 / frameMs).toFixed(0)} fps`; }
 }
 
-// first frame behind the loader, then fade (no black flash)
-player.applyCamera(rig.camera);
-culler.update(player.x, player.z, player.feet);
+// ---- boot: first frame rendered behind the loader, then a 600 ms fade (no black flash) ----
+setQuality('auto');
+time.set(17.75);
+dock.setTour(true);
+step(0);
+rig.renderer.shadowMap.needsUpdate = true;
 rig.renderer.compile(rig.scene, rig.camera);
 rig.renderer.render(rig.scene, rig.camera);
 const loader = document.getElementById('loader')!;
 (document.getElementById('loaderBar') as HTMLElement).style.width = '100%';
 requestAnimationFrame(() => { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 650); });
 
-if (TEST) installTestApi({ rig, built, player, culler, squareFootage: sf });
+if (TEST) installTestApi({ rig, built, player, culler, director, tour, time, caption, labels, measure, step, squareFootage: sf });
 else rig.renderer.setAnimationLoop(frame);
