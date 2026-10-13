@@ -7,6 +7,9 @@ declare global { interface Window { __app: App } }
 
 const OUT = path.join(PROOF, 'stage1');
 
+// each level's test appends its score: start from an empty file every run
+test.beforeAll(() => fs.rmSync(path.join(OUT, 'alignment.txt'), { force: true }));
+
 test('clay plan views of all three levels (roof hidden)', async ({ page }) => {
   const errors = await openApp(page);
   for (const L of [0, 1, 2]) {
