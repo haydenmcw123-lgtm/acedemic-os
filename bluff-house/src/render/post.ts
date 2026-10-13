@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BlendFunction, BloomEffect, BrightnessContrastEffect, Effect, EffectComposer, EffectPass, HueSaturationEffect, NoiseEffect, RenderPass, SMAAEffect, SMAAPreset, ToneMappingEffect, ToneMappingMode, VignetteEffect } from 'postprocessing';
+import { BlendFunction, BloomEffect, Effect, EffectComposer, EffectPass, HueSaturationEffect, NoiseEffect, RenderPass, SMAAEffect, SMAAPreset, ToneMappingEffect, ToneMappingMode, VignetteEffect } from 'postprocessing';
 // n8ao ships without type declarations
 // @ts-expect-error untyped module
 import { N8AOPostPass } from 'n8ao';
@@ -15,6 +15,21 @@ class ExposureEffect extends Effect {
   }
   get exposure() { return this.uniforms.get('exposure')!.value as number; }
   set exposure(v: number) { this.uniforms.get('exposure')!.value = v; }
+}
+
+/**
+ * Display-referred S-curve: adds midtone contrast but, unlike a linear contrast control, keeps
+ * black at 0 and white at 1 with a soft shoulder, so bright glass is never pushed into clipping.
+ */
+class SCurveEffect extends Effect {
+  constructor(amount: number) {
+    super('SCurveEffect', /* glsl */ `
+      uniform float amount;
+      void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+        vec3 c = clamp(inputColor.rgb, 0.0, 1.0);
+        outputColor = vec4(mix(c, c * c * (3.0 - 2.0 * c), amount), inputColor.a);
+      }`, { uniforms: new Map([['amount', new THREE.Uniform(amount)]]) });
+  }
 }
 
 export type ToneMap = 'agx' | 'aces';
@@ -66,9 +81,9 @@ export class Post {
     const vignette = new VignetteEffect({ offset: 0.32, darkness: 0.42 });
     const noise = new NoiseEffect({ premultiply: true, blendFunction: BlendFunction.SCREEN });
     noise.blendMode.opacity.value = 0.02; // ≤ 2% grain
-    // AgX is gentle on highlights (the windows stay readable) but flat; a touch of contrast and
-    // saturation after it brings back some of ACES's punch without its blown-out glass
-    const contrast = new BrightnessContrastEffect({ contrast: 0.07 });
+    // AgX is gentle on highlights (the windows stay readable) but flat; a soft S-curve and a little
+    // saturation after it bring back some of ACES's punch without its blown-out glass
+    const contrast = new SCurveEffect(0.3);
     const saturation = new HueSaturationEffect({ saturation: 0.08 });
     this.grade = new EffectPass(camera, this.exposure, this.bloom, this.tone, contrast, saturation, vignette, noise);
     this.composer.addPass(this.grade);

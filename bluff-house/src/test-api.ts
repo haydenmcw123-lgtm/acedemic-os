@@ -49,6 +49,8 @@ export function installTestApi(d: Deps) {
     const room = built.plan.roomAt(L, player.x, player.z);
     return { x: player.x, z: player.z, feet: player.feet, yaw: player.yaw, level: L, room: room?.id ?? null };
   };
+  let filmLast: number[] | null = null;
+  let filmCanvas: HTMLCanvasElement | null = null;
   const api = {
     ready: true,
     sqft: d.squareFootage,
@@ -187,6 +189,7 @@ export function installTestApi(d: Deps) {
     /** 0 = normal, 1 = AO only, 2 = no AO (debug views). */
     aoMode: (m: number) => { d.post.ao.configuration.renderMode = m === 2 ? 0 : m; d.post.ao.enabled = m !== 2; },
     lightCounts: () => d.interior.counts,
+    post: () => d.post,
     /**
      * Renders a fixed view at a given clock time and returns the image plus a health check:
      * pure-black pixels (NaN / bloom black squares), clipped pixels (blown highlights), mean luminance.
@@ -227,6 +230,60 @@ export function installTestApi(d: Deps) {
       let nanInf = 0;
       for (let i = 0; i < hdr.length; i += 4) if ((hdr[i] & 0x7c00) === 0x7c00 || (hdr[i + 1] & 0x7c00) === 0x7c00 || (hdr[i + 2] & 0x7c00) === 0x7c00) nanInf++;
       return { url, black: black / n, clipped: clipped / n, nanInf, meanLum: lum / n / 255, exposure: d.time.exposure, sunEl: d.time.sun.elevation, calls, tris };
+    },
+    /**
+     * Video recording (tests/record.spec.ts): measures the tour's length with a fixed-step dry run,
+     * restarts it, sets the clock and frame size, and hides the controls (the room captions stay).
+     */
+    filmBegin(w: number, h: number, hour: number) {
+      const dry = api.simTour(1 / 30);
+      d.time.set(hour);
+      setSize(w, h);
+      for (const sel of ['.dock', '#chip', '#hkey', '#cross', '#labels', '#loader']) document.querySelectorAll<HTMLElement>(sel).forEach((e) => (e.style.display = 'none'));
+      d.caption.film = true;
+      d.director.restart();
+      filmLast = null;
+      d.renderSettled();
+      return { seconds: dry.seconds as number };
+    },
+    /** Advances the simulation k fixed steps without rendering (resuming an interrupted recording). */
+    filmSkip(k: number, dt: number) { for (let i = 0; i < k; i++) d.step(dt); filmLast = null; },
+    /**
+     * One video frame: a fixed simulation step, then the full post-processed render with the room
+     * caption drawn on top, returned as a JPEG. When nothing on screen changed (the camera resting
+     * at a stop) it returns { same: true } and the recorder repeats the previous frame instead.
+     */
+    filmFrame(dt: number) {
+      d.step(dt);
+      const hud = document.getElementById('hud')!;
+      const key = [...rig.camera.matrixWorld.elements, d.time.exposure, +(hud.style.opacity || 0)];
+      const changed = !filmLast || rig.renderer.shadowMap.needsUpdate || key.some((v, i) => Math.abs(v - filmLast![i]) > 1e-5);
+      if (!changed) return { same: true };
+      filmLast = key;
+      d.post.render(dt);
+      const gl = rig.renderer.domElement;
+      filmCanvas ??= document.createElement('canvas');
+      filmCanvas.width = gl.width; filmCanvas.height = gl.height;
+      const g = filmCanvas.getContext('2d')!;
+      g.drawImage(gl, 0, 0);
+      const alpha = +(hud.style.opacity || 0);
+      if (alpha > 0.001) {
+        // the caption, drawn from the live DOM's own text, fonts and layout
+        g.save();
+        g.globalAlpha = alpha;
+        g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowBlur = 16; g.shadowOffsetY = 1;
+        g.textBaseline = 'middle';
+        for (const el of Array.from(hud.children) as HTMLElement[]) {
+          const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+          g.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          (g as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing;
+          g.fillStyle = cs.color;
+          const text = cs.textTransform === 'uppercase' ? (el.textContent ?? '').toUpperCase() : el.textContent ?? '';
+          g.fillText(text, r.left, r.top + r.height / 2);
+        }
+        g.restore();
+      }
+      return { same: false, url: filmCanvas.toDataURL('image/jpeg', 0.93) };
     },
     info() { return { calls: rig.renderer.info.render.calls, tris: rig.renderer.info.render.triangles }; },
     /** Runs level culling for the current position and reports which interior groups are drawn. */

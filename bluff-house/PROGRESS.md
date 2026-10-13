@@ -1,13 +1,13 @@
 # Bluff House walkthrough: progress
 
-## Status: Stage 2 (Tour + UI) done, waiting for approval
+## Status: Stage 3 (Materials + realtime lighting) done, waiting for approval
 
 | Stage | Status |
 |---|---|
 | 1. Skeleton (clay geometry, collisions, stairs, level culling) | ✅ approved, proof in `proof/stage1/` |
-| 2. Tour + UI | ✅ done, proof in `proof/stage2/` |
-| 3. Materials + realtime lighting | ⏳ next |
-| 4. Furniture + exterior | — |
+| 2. Tour + UI | ✅ approved, proof in `proof/stage2/` |
+| 3. Materials + realtime lighting | ✅ done, proof in `proof/stage3/` |
+| 4. Furniture + exterior | ⏳ next |
 | 5. Baked GI + reflection probes | — |
 | 6. Performance + polish | — |
 | 7. Ship | — |
@@ -80,9 +80,52 @@
   - `shortcut-card.png`.
   - `live-tour-running.png`: the real render loop playing the tour.
 
-## Next (Stage 3: materials + realtime lighting)
+## Stage 3: what was built
 
-- PBR material library, physical sky + PMREM, tuned shadows, RectAreaLights in the big glass, the 8-light interior pool, post-processing (N8AO, SMAA, bloom, AgX vs ACES) and 10 fixed screenshots at Noon / Golden / Night.
+- **Materials** (`materials/library.ts`, `materials/procedural.ts`): one table of PBR materials, keyed by the wall and floor kinds in the JSON.
+  - Every texture (hickory, plaster, ledge stone, board-and-batten, oak, walnut, tile, slate, pavers, deck boards, standing seam, pool mosaic, grass) is generated in code: color, normal and roughness/AO maps, tiled in real feet.
+  - Floors and cabinetry are `MeshPhysicalMaterial` with clearcoat. Roughness never goes below **0.11** (lower overflows half-float and bloom turns it into black squares).
+  - **Glass:** a faint green body tint that grows at grazing angles, full-strength Fresnel reflection of the sky, and no shadow casting.
+- **Sky and environment** (`lighting/sky.ts`): the three.js physical Sky with its output clamped to **≤ 24**, light clouds and night stars. A PMREM environment map is rebuilt from it at most every **250 ms**, and only when the sun moves.
+- **Height fog** (`render/fog.ts`): it thickens toward the lake (−50 ft) and thins with height, so the valley hazes and the house stays crisp.
+- **Shadows:** a **4096** map, PCF soft (radius 2.5), a **±70 ft** box around the house, and `autoUpdate` off. They re-render only when the sun or the bookcase door moves.
+- **Interior light** (`lighting/interior.ts`, `fixtures.ts`, `interiorEnv.ts`). Light counts are fixed, so shaders never recompile while you walk.
+  - Hemisphere fill.
+  - **4 RectAreaLights** in the nearest big glass walls, driven by daylight.
+  - A pool of **8 shadowless 2700 K point lights** re-assigned every 250 ms to the nearest room fixtures.
+  - **Recessed cans:** 6.5 ft grid, instanced emissive discs in trim rings, so they bloom at night.
+  - A small "room" environment map, so interior surfaces reflect a warm room and a window instead of the open sky.
+- **Post-processing** (`render/post.ts`, pmndrs `postprocessing` + N8AO), in a half-float HDR chain: N8AO → exposure → bloom → tone map → grade → vignette + grain → SMAA.
+  - **N8AO:** half resolution on High. Its radius is a world-space 4 ft, so distant ridges get no AO and there are no dark ridge lines.
+  - **Bloom:** mipmap blur with threshold 1.1.
+  - **Tone mapping:** AgX by default, with ACES available for A/B.
+  - **Grade:** a soft S-curve and +8% saturation.
+  - **Grain:** 2%.
+- **Time of day** (`lighting/timeofday.ts`) moves everything together: sun, sky, PMREM, fog color and density, lake color, hemisphere, daylight through the glass, lamps on below ~3° of sun, and exposure (separate targets inside and outside, eased as you walk through a door).
+
+## Stage 3 proof (`pnpm test`: all passing)
+
+- `proof/stage3/contact-sheet.jpg`: the **10 fixed views × Noon / Golden / Night**, full-size frames in `proof/stage3/views/`.
+- `proof/stage3/health.csv`, from `tests/visual.spec.ts`, which checks every frame:
+  - **0 Inf/NaN pixels** in the HDR buffer in all 30 frames. This is the root cause of bloom "black squares", counted exactly.
+  - **Clipped (blown-out) pixels ≤ 0.73%** in every frame (the test fails above 3%). The worst frames are looking into the low sun through the west glass at 5:45 PM.
+  - **52–112 scene draw calls** and ~110k triangles per view (shadow pass not included).
+- Reviewed by eye for shadow acne, AO lines on distant ridges, floating objects and z-fighting. The review found z-fighting between the interior ceilings and the roof slab's underside (a sawtooth on the Study ceiling). Fixed by setting ceilings 0.04 ft lower.
+- `proof/stage3/tonemap-agx-left-aces-right.jpg`: AgX keeps the great-room glass readable at golden hour, while ACES blows it out. ACES is punchier at night.
+- `tests/baselines/stage3/`: these frames at 640×360 become the approved baselines once you OK this stage. Later stages fail if a view changes by more than MAE 6/255 without re-approval.
+
+## Next (Stage 4: furniture + exterior)
+
+- Furniture from `furnitureByRoom` (the Furnished toggle), the bluff planting and rock, the far shore, landscape lighting and the fire in the firebox.
+
+## Walkthrough video (`tests/record.spec.ts`)
+
+- `RECORD=1 pnpm exec playwright test tests/record.spec.ts` renders the guided tour to `video/bluff-house-tour.mp4` (git-ignored):
+  - a fixed 1/30 s step per frame, so it's perfectly smooth however slow each frame is to render;
+  - room captions drawn on, with fades on simulation time;
+  - frames where nothing changed are reused;
+  - resumable: frames already on disk are kept.
+- Software rendering costs ~2 s per 960×540 frame, so the full 6.4-minute tour takes a few hours headless. On a real GPU the same code would record in minutes.
 
 ## Decisions made (please confirm or overrule)
 
@@ -116,11 +159,25 @@
 11. **The stair glass starts 1 ft into flight A on the two lower levels.** The treads there are under a foot high, so there's no fall risk, and it keeps the turn onto the stair clear. On the top floor the guard still runs the full length of the well.
 12. **NOAA sun pulled forward from Stage 3.** The time slider needed a real sun. The physical sky and lighting are still Stage 3.
 
+### Stage 3 decisions
+
+13. **Procedural textures instead of downloaded CC0 sets.** This environment's network policy blocks the texture hosts (ambientCG, Poly Haven). Every material is generated in code at real-world scale.
+    - Swapping in photo-scanned sets later is a change to one table.
+    - To allow the hosts: environment menu → Edit → Network access → Allowed domains, then add `ambientcg.com`, `acg-download.struffelproductions.com`, `dl.polyhaven.org` and `api.polyhaven.com`.
+14. **AgX over ACES.** AgX keeps the glass walls and the lake readable when the sun is in frame. ACES clips them. A soft S-curve after AgX restores the punch without clipping; a linear contrast boost had pushed two golden frames past 3% clipped.
+15. **Interior environment stand-in.** Until Stage 5's baked lighting and box-projected probes, interior surfaces reflect a small generated "room" (warm floor, walls, a window that follows the sky, lamps at night) instead of the open sky. Otherwise every interior had a blue-white sheen.
+16. **AO limited by distance, not by a box.** N8AO's radius is a world-space 4 ft with distance falloff. Far terrain can't produce dark ridge lines, and no clipping box is needed.
+17. **Glass without a transmission pass.** It's a premultiplied blend with Fresnel reflection. A transmission pass would re-render the scene behind every pane, and the look is the same for clear architectural glass.
+18. **Recessed cans:** each can is an emissive disc that blooms. The "soft pool" under them comes from the pooled room lights (2.2 ft below the ceiling), not one light per can. 100+ real lights would be too many; Stage 5's bake gives each can its true pool.
+19. **Camera 10 (house from the dock).** The dock sits under a boathouse roof, and the ~56-ft, ~50° bluff hides everything below the top floor from the water's edge. The shot is taken from the foot of the bluff stairs, where only the top of the house clears the crest. **Proposal:** add an 11th view "house from the water" (a boat-height camera ~150 ft out) as the hero exterior.
+
 ## Known issues (to fix in later stages)
 
 - The terrain is a 2-ft grid, so a 2-ft sloped "trench" shows outside buried lower-level walls (Stage 4: finer grid near the house).
-- The sky is a flat color that follows the time of day. The physical sky and environment lighting are Stage 3.
 - Quality "Auto" equals "High" until the adaptive system in Stage 6. Medium and Low already change the pixel ratio and shadow-map size.
 - The loader bar is honest but trivial for now: there are no downloaded assets until Stage 4.
+- Some interior light leaks: the RectAreaLights and point lights have no shadows, so a little daylight or lamplight reaches surfaces it shouldn't (Stage 5's bake fixes this).
+- The bluff is plain grass, there's no far shore yet, and the firebox has no fire (Stage 4).
+- At night the view from the dock is almost black: there are no landscape or stair lights yet (Stage 4).
 - Headless frame rates are SwiftShader (software) numbers and say nothing about real GPU speed.
 - The interior draw-call counts include the shadow pass and stay under 250. They will grow with furniture (Stage 4).
