@@ -1,4 +1,5 @@
-// One-off provenance script: builds house-data.json from reference/bluff-house-v3.html.
+// Provenance script (superseded: the original kit's data is now in reference/house-data.kit.json).
+// Builds house-data.json from reference/bluff-house-v3.html.
 // Plan data (rooms, open spans, openings, tour) is parsed from the prototype source;
 // furniture footprints are measured by running the prototype headless and reading
 // each placed item's bounding box. Needs three r160 on disk (the prototype's CDN
@@ -66,12 +67,16 @@ const BUILTIN = new Set(['Cabinetry', 'Island', 'Vanity', 'Closet system', 'Book
   'Outdoor kitchen', 'Hot tub', 'Espresso machine', 'Hitting mat', 'TV', 'Media console']);
 const FL = [0, 11, 22];
 const r2 = (v) => Math.round(v * 100) / 100;
+// An item belongs to the highest room at (x, z) whose floor is at or below its base
+// (a range hood mounted 6 ft up in the kitchen is still in the kitchen).
 function roomFor(x, z, y) {
-  const level = y < 5.6 ? 0 : y < 16.6 ? 1 : 2;
-  if (y >= -1 && y < 30) {
-    for (const r of rooms) if (r.level === level && !r.void && r.rects.some(([x0, z0, x1, z1]) => x >= x0 && x < x1 && z >= z0 && z < z1)) return { id: r.id, level };
+  if (y >= -1 && y < 32) {
+    for (const level of [2, 1, 0]) {
+      if (FL[level] > y) continue;
+      for (const r of rooms) if (r.level === level && !r.void && r.rects.some(([x0, z0, x1, z1]) => x >= x0 && x < x1 && z >= z0 && z < z1)) return { id: r.id, level };
+    }
   }
-  return { id: 'exterior', level };
+  return { id: 'exterior', level: y < 5.6 ? 0 : y < 16.6 ? 1 : 2 };
 }
 const furnitureByRoom = {};
 for (const it of plan) {

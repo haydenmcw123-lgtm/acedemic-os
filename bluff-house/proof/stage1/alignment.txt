@@ -1,3 +1,6 @@
 level 0: 100.0% of generated wall pixels land on the drawing's walls (±1 px = ±1 in); 100.0% of the drawing's solid wall pixels are covered by generated walls
 level 1: 100.0% of generated wall pixels land on the drawing's walls (±1 px = ±1 in); 100.0% of the drawing's solid wall pixels are covered by generated walls
 level 2: 100.0% of generated wall pixels land on the drawing's walls (±1 px = ±1 in); 100.0% of the drawing's solid wall pixels are covered by generated walls
+level 0: 100.0% of generated wall pixels land on the drawing's walls (±1 px = ±1 in); 100.0% of the drawing's solid wall pixels are covered by generated walls
+level 1: 100.0% of generated wall pixels land on the drawing's walls (±1 px = ±1 in); 100.0% of the drawing's solid wall pixels are covered by generated walls
+level 2: 100.0% of generated wall pixels land on the drawing's walls (±1 px = ±1 in); 100.0% of the drawing's solid wall pixels are covered by generated walls

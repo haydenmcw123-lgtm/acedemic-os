@@ -61,7 +61,7 @@
 - **Measuring** (`ui/measure.ts`, M): click two surface points to get a line and a feet-inches label (e.g. `4′ 9″`). Esc cancels. With the mouse captured, the crosshair picks.
 - **Outdoor naming** (`ui/where.ts`): outdoor areas get names from the site data (Covered Deck, Pool Terrace, Bluff Stairs, Boat Dock, Front Entry, Motor Court) with the captions from `outdoorAreas`.
 
-## Stage 2 proof (`pnpm test`: 20/20 passing, including all Stage 1 tests)
+## Stage 2 proof (`pnpm test`: 24/24 passing, including all Stage 1 tests and the kit-consistency checks)
 
 - `proof/stage2/tour-report.txt`, from the fixed 1/30 s simulation of the whole tour:
   - **1,053 ft in 6.44 minutes**, and it completes.
@@ -86,9 +86,13 @@
 
 ## Decisions made (please confirm or overrule)
 
-1. **Input files.** `house-data.json` and the prototype weren't in the repo. I took the prototype from your "Bluff House" artifact (`reference/bluff-house-v3.html`) and the approved plans from the "Bluff House Floor Plans" canvas (`reference/plans/`).
-   - `scripts/extract-prototype.mjs` rebuilds the JSON from the prototype. It parses the plan data and measures the furniture by running the prototype headless.
-   - If you have your own `house-data.json`, drop it in and rebuild. The schema is in `src/data/types.ts`.
+1. **Input files.** Your kit (`bluff-house-claude-code-kit.zip`) is now in the repo:
+   - `PROMPT.md` is the spec.
+   - `reference/` holds the prototype and the approved plans. They're the same as the copies I first pulled from your artifacts, apart from file formatting.
+   - `reference/house-data.kit.json` is your original data, kept untouched.
+   - `house-data.json` is the working copy. It equals the kit on rooms, open spans and openings (checked by `tests/data.spec.ts`), and adds the `site`, `stair` and `location` sections plus the re-centered tour stops.
+   - **Furniture positions:** the kit stores where the prototype *placed* each item; `house-data.json` stores the center of each item's measured footprint. They're up to 1.6 ft apart (the sectional's chaise). The spec asks for the center so a model can be fitted to the `size` box in Stage 4, so I kept the footprint centers.
+   - **Range hood:** my first extraction put it in Bedroom 4 (above it, by height). The kit is right that it belongs in the kitchen. Fixed, and the extractor too.
 2. **three.js r186 instead of r17x.** r186 is the current stable release, and the pmndrs `postprocessing` library supports it. It's pinned exactly: `three@0.186.1`.
 3. **Site data moved into the JSON.** The decks, terrace, pool, entry, motor court, bluff stairs and dock were hard-coded in the prototype. They're now a `site` section of `house-data.json`, so they follow the same "change the JSON, rebuild" rule.
 4. **Stair runs.** 8 treads × 11 in = 7.33 ft, so flight A starts at z 24.67 (not 24) and flight B ends at x 44.67 (not 44). The extra 8 in is hall floor.
