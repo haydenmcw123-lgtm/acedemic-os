@@ -10,14 +10,14 @@ declare global { interface Window { __app: App } }
  * The ten fixed views from the spec, each at Noon / Golden / Night.
  * Every frame gets a health check: Inf/NaN pixels in the HDR buffer (what bloom turns into
  * "black squares") and clipped pixels (blown-out highlights). Frames are compared at 640×360
- * against the approved baselines in tests/baselines/stage3; UPDATE_BASELINES=1 (re)approves them.
+ * against the approved baselines in tests/baselines/<stage>; UPDATE_BASELINES=1 (re)approves them.
  */
 // [name, x, z, feet, yaw, pitch] — yaw 0 = north, π/2 = west toward the lake
 export const VIEWS: [string, number, number, number, number, number][] = [
   ['01-front-entry-from-motor-court', 92, 11, 11, Math.PI / 2 - 0.12, 0.06],
   ['02-foyer-toward-great-room', 52, 4, 11, 2.75, -0.02],
   ['03-great-room-toward-lake', 22, 36, 11, Math.PI / 2, 0.08],
-  ['04-kitchen-island-toward-lake', 36, 40, 11, Math.PI / 2 - 0.05, -0.02],
+  ['04-kitchen-island-toward-lake', 42.6, 41, 11, Math.PI / 2 - 0.05, -0.06],
   ['05-primary-bedroom', 16, 18, 11, 0.86, -0.05],
   ['06-primary-bath', 36, 10, 11, 1.107, -0.1],
   ['07-study-through-bookcase-door', 13.5, 21.2, 22, 0.32, -0.04],
@@ -25,14 +25,17 @@ export const VIEWS: [string, number, number, number, number, number][] = [
   ['09-game-room-at-walkout', 22, 46, 0, Math.PI / 2 - 0.15, -0.02],
   // the bluff is ~56 ft at ~50°, so from the dock only the top of the house clears the crest
   ['10-house-from-dock', -82, 85, -46.2, -1.12, 0.6],
+  // added in Stage 4 (the dock sits under its roof and below the bluff): the hero exterior, from a boat
+  ['11-house-from-the-water', -260, 30, -49, -Math.PI / 2, 0.12],
 ];
 export const HOURS: [string, number][] = [['noon', 12.5], ['golden', 17.75], ['night', 20.5]];
 
-const OUT = path.join(PROOF, 'stage3', 'views');
-const BASE = path.join(ROOT, 'tests', 'baselines', 'stage3');
+const STAGE = 'stage4';
+const OUT = path.join(PROOF, STAGE, 'views');
+const BASE = path.join(ROOT, 'tests', 'baselines', STAGE);
 const UPDATE = !!process.env.UPDATE_BASELINES;
 
-test('ten fixed views at Noon, Golden and Night: no Inf/NaN, no blown-out frames', async ({ page }) => {
+test('the fixed views at Noon, Golden and Night: no Inf/NaN, no blown-out frames', async ({ page }) => {
   test.setTimeout(1_800_000);
   const errors = await openApp(page);
   fs.mkdirSync(OUT, { recursive: true });
@@ -74,9 +77,9 @@ test('ten fixed views at Noon, Golden and Night: no Inf/NaN, no blown-out frames
     execSync(`convert ${files.map((f) => `"${f}"`).join(' ')} -resize 640x360 +append "${row}"`);
     rows.push(row);
   }
-  execSync(`convert ${rows.map((f) => `"${f}"`).join(' ')} -append -quality 88 "${path.join(PROOF, 'stage3', 'contact-sheet.jpg')}"`);
+  execSync(`convert ${rows.map((f) => `"${f}"`).join(' ')} -append -quality 88 "${path.join(PROOF, STAGE, 'contact-sheet.jpg')}"`);
   for (const r of rows) fs.unlinkSync(r);
-  fs.writeFileSync(path.join(PROOF, 'stage3', 'health.csv'), report.join('\n') + '\n');
+  fs.writeFileSync(path.join(PROOF, STAGE, 'health.csv'), report.join('\n') + '\n');
   console.log(report.join('\n'));
   expect(errors).toEqual([]);
   expect(problems).toEqual([]);
@@ -85,7 +88,7 @@ test('ten fixed views at Noon, Golden and Night: no Inf/NaN, no blown-out frames
 test('tone mapping A/B: AgX vs ACES Filmic', async ({ page }) => {
   test.setTimeout(600_000);
   await openApp(page);
-  const out = path.join(PROOF, 'stage3', 'tonemap-ab');
+  const out = path.join(PROOF, STAGE, 'tonemap-ab');
   fs.rmSync(out, { recursive: true, force: true });
   fs.mkdirSync(out, { recursive: true });
   const pairs: string[] = [];
@@ -100,7 +103,7 @@ test('tone mapping A/B: AgX vs ACES Filmic', async ({ page }) => {
     execSync(`convert ${files.map((f) => `"${f}"`).join(' ')} -resize 640x360 +append "${pair}"`);
     pairs.push(pair);
   }
-  execSync(`convert ${pairs.map((f) => `"${f}"`).join(' ')} -append -quality 88 "${path.join(PROOF, 'stage3', 'tonemap-agx-left-aces-right.jpg')}"`);
+  execSync(`convert ${pairs.map((f) => `"${f}"`).join(' ')} -append -quality 88 "${path.join(PROOF, STAGE, 'tonemap-agx-left-aces-right.jpg')}"`);
   fs.rmSync(out, { recursive: true, force: true }); // only the side-by-side sheet is kept
   await page.evaluate(() => window.__app.setToneMap('agx'));
 });

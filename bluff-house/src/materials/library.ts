@@ -22,6 +22,13 @@ interface Spec {
   emissive?: number;
   side?: THREE.Side;
   shadow?: boolean; // casts shadows (glass doesn't)
+  sheenColor?: number;
+  sheenRough?: number;
+  /** with `emissive`: `glow` is the intensity added when lamps are fully on, `glowDay` the constant part */
+  glow?: number;
+  glowDay?: number;
+  emissiveMap?: boolean; // the albedo map doubles as the emissive map (screens)
+  alphaTest?: number; // leaf cards
 }
 
 /** Roughness is never below 0.11: lower values overflow half-float specular and bloom turns them into black squares. */
@@ -74,21 +81,91 @@ const SPECS: Record<string, Spec> = {
   poolTile: { tex: 'poolTile', rough: 1, env: 1 },
   terrain: { tex: 'grass', rough: 1, env: 0.35 },
   lake: { color: 0x163036, rough: 0.12, metal: 0.05, env: 1.25 },
+  // furniture: upholstery finishes (the staging click cycles linen → leather → bouclé)
+  linen: { tex: 'fabric', color: 0xd6cab6, rough: 1, sheen: 0.6, sheenRough: 0.55, sheenColor: 0x8a8580, env: 0.3, normalScale: 0.5 },
+  leather: { tex: 'leather', color: 0x8b5330, rough: 1, clearcoat: 0.25, clearcoatRough: 0.45, env: 0.8 },
+  boucle: { tex: 'boucle', color: 0xf3ede2, rough: 1, sheen: 0.8, sheenRough: 0.6, sheenColor: 0xbab2a6, env: 0.25 },
+  charcoal: { tex: 'fabric', color: 0x5a5b60, rough: 1, sheen: 0.5, sheenRough: 0.5, sheenColor: 0x6a6a70, env: 0.3, normalScale: 0.5 },
+  canvas: { tex: 'fabric', color: 0xd9cdb5, rough: 1, sheen: 0.3, sheenRough: 0.7, sheenColor: 0x8a8580, env: 0.3, normalScale: 0.6 },
+  sheet: { tex: 'fabric', color: 0xf1eee8, rough: 1, sheen: 0.7, sheenRough: 0.6, sheenColor: 0xbdb6ab, env: 0.25, normalScale: 0.4 },
+  duvet: { tex: 'fabric', color: 0xe6e0d4, rough: 1, sheen: 0.7, sheenRough: 0.6, sheenColor: 0xbdb6ab, env: 0.25, normalScale: 0.4 },
+  accent: { tex: 'fabric', color: 0x9c6a48, rough: 1, sheen: 0.6, sheenRough: 0.5, sheenColor: 0x8a6a50, env: 0.3, normalScale: 0.5 },
+  felt: { tex: 'felt', color: 0x245a3c, rough: 1, env: 0.2 },
+  rug0: { tex: 'rug0', rough: 1, env: 0.2 },
+  rug1: { tex: 'rug1', rough: 1, env: 0.2 },
+  rug2: { tex: 'rug2', rough: 1, env: 0.2 },
+  // furniture: hard surfaces
+  quartz: { tex: 'quartz', rough: 1, clearcoat: 0.5, clearcoatRough: 0.15, env: 1 },
+  lightwood: { tex: 'lightwood', rough: 1, env: 0.8 },
+  chrome: { color: 0xd8dade, rough: 0.12, metal: 1, env: 1.2 },
+  stainless: { color: 0xbfc2c4, rough: 0.3, metal: 0.9, env: 1 },
+  black: { color: 0x141414, rough: 0.5, env: 0.6 },
+  white: { color: 0xece8e1, rough: 0.6, env: 0.7 },
+  paper: { color: 0xe9e2d4, rough: 0.9, env: 0.4 },
+  ceramic: { color: 0xf4f2ee, rough: 0.12, env: 1 },
+  glassDark: { color: 0x1b2226, rough: 0.11, metal: 0.3, env: 1.2 },
+  mirror: { color: 0x8d9497, rough: 0.11, metal: 1, env: 0.6 },
+  potDark: { color: 0x2f2b28, rough: 0.7, env: 0.5 },
+  cabinetPaint: { color: 0x47504a, rough: 0.5, env: 0.7 },
+  carPaint: { color: 0x25402f, rough: 0.3, metal: 0.45, clearcoat: 1, clearcoatRough: 0.11, env: 1.3 },
+  coupePaint: { color: 0x8f1d1d, rough: 0.3, metal: 0.45, clearcoat: 1, clearcoatRough: 0.11, env: 1.3 },
+  hull: { color: 0x1f2b45, rough: 0.25, clearcoat: 1, clearcoatRough: 0.11, env: 1.3 },
+  screenTV: { color: 0x0b0c0e, rough: 0.11, metal: 0.2, env: 1.2 },
+  screenGame: { tex: 'screenGame', rough: 0.2, emissive: 0xffffff, glowDay: 0.9, emissiveMap: true, env: 0.3 },
+  screenGolf: { tex: 'screenGolf', rough: 0.9, emissive: 0xffffff, glowDay: 1.0, emissiveMap: true, env: 0.2 },
+  art0: { tex: 'art0', rough: 0.85, env: 0.4 },
+  art1: { tex: 'art1', rough: 0.85, env: 0.4 },
+  art2: { tex: 'art2', rough: 0.85, env: 0.4 },
+  art3: { tex: 'art3', rough: 0.85, env: 0.4 },
+  foliage: { tex: 'leafCard', rough: 1, env: 0.35, alphaTest: 0.5, side: THREE.DoubleSide },
+  shade: { tex: 'fabric', color: 0xefe6d6, rough: 1, emissive: 0xffc98a, glow: 1.2, env: 0.3, side: THREE.DoubleSide },
+  opal: { color: 0xf6f1e8, rough: 0.3, emissive: 0xffe0b0, glow: 3, env: 0.6 },
+  plant: { color: 0x3d5a32, rough: 0.8, env: 0.4 },
+  // landscape
+  forest: { tex: 'canopy', rough: 1, env: 0.25, normalScale: 1.2 },
+  ridge: { color: 0x2c3a34, rough: 1, env: 0.2 },
+  bark: { tex: 'bark', rough: 1, env: 0.3, normalScale: 1.2 },
+  rock: { tex: 'rock', rough: 1, env: 0.4, normalScale: 1.4 },
+  leafOrange: { tex: 'leafOrange', rough: 1, env: 0.3, alphaTest: 0.5, side: THREE.DoubleSide },
+  leafRed: { tex: 'leafRed', rough: 1, env: 0.3, alphaTest: 0.5, side: THREE.DoubleSide },
+  leafGold: { tex: 'leafGold', rough: 1, env: 0.3, alphaTest: 0.5, side: THREE.DoubleSide },
+  needles: { tex: 'needles', rough: 1, env: 0.3, alphaTest: 0.5, side: THREE.DoubleSide },
+  heater: { color: 0x1a1414, rough: 0.6, emissive: 0xff3a10, glow: 3, glowDay: 0, env: 0.2 },
+  poolGlow: { color: 0xdffaff, rough: 0.3, emissive: 0x7fe0ff, glow: 8, glowDay: 0, env: 0.3 },
+  bookcloth: { color: 0xffffff, rough: 0.8, env: 0.4 },
+  bottleGlass: { color: 0xffffff, rough: 0.12, metal: 0.1, clearcoat: 1, clearcoatRough: 0.11, env: 1.3 },
+  ember: { color: 0x2a140a, rough: 0.9, emissive: 0xff5a14, glowDay: 2.5, env: 0.1 },
 };
 
 const cache = new Map<string, THREE.Material>();
+/**
+ * Materials in the "loose" pool belong only to movable furniture, so the Furnished toggle can fade
+ * them without touching the architecture that shares the same finishes.
+ */
+export type Pool = 'arch' | 'loose';
+export const LOOSE_MATERIALS: THREE.MeshStandardMaterial[] = [];
 /** Interior-variant materials: they reflect the interior environment instead of the sky. */
 export const INTERIOR_MATERIALS: THREE.MeshStandardMaterial[] = [];
 /** Materials whose emissive follows the electric lights (tests and the light rig read this). */
 export const EMISSIVE_FIXTURES: THREE.MeshStandardMaterial[] = [];
 
-export function material(key: string, variant: Variant = 'ext'): THREE.Material {
-  const ck = key + '|' + variant;
+export function material(key: string, variant: Variant = 'ext', pool: Pool = 'arch'): THREE.Material {
+  const ck = key + '|' + variant + (pool === 'loose' ? '|loose' : '');
   let m = cache.get(ck);
   if (m) return m;
-  m = make(key, variant);
+  if (pool === 'loose') {
+    const src = material(key, variant);
+    m = src.clone();
+    // clone() deep-copies userData through JSON, which turns object references into plain data
+    m.userData.depthMat = src.userData.depthMat;
+  } else m = make(key, variant);
   m.name = ck;
-  if (variant === 'int' && (m as THREE.MeshStandardMaterial).isMeshStandardMaterial) INTERIOR_MATERIALS.push(m as THREE.MeshStandardMaterial);
+  const std = (m as THREE.MeshStandardMaterial).isMeshStandardMaterial ? (m as THREE.MeshStandardMaterial) : null;
+  if (std && variant === 'int') INTERIOR_MATERIALS.push(std);
+  if (std && pool === 'loose') {
+    LOOSE_MATERIALS.push(std);
+    if (EMISSIVE_FIXTURES.includes(material(key, variant) as THREE.MeshStandardMaterial)) EMISSIVE_FIXTURES.push(std);
+  }
   cache.set(ck, m);
   return m;
 }
@@ -98,6 +175,7 @@ function make(key: string, variant: Variant): THREE.Material {
   if (key === 'water') return waterMaterial();
   if (key === 'bulb') {
     const b = new THREE.MeshStandardMaterial({ color: 0xfff3e2, emissive: new THREE.Color(0xffb46b), emissiveIntensity: 0, roughness: 0.4 });
+    b.userData.glow = 28;
     EMISSIVE_FIXTURES.push(b);
     return b;
   }
@@ -120,11 +198,26 @@ function make(key: string, variant: Variant): THREE.Material {
     opts.aoMap = t.ormMap; // R channel, indirect light only
     opts.aoMapIntensity = 1;
   }
+  if (t && s.emissiveMap) opts.emissiveMap = t.map;
+  if (s.alphaTest) opts.alphaTest = s.alphaTest;
   const mat = physical
-    ? new THREE.MeshPhysicalMaterial({ ...opts, clearcoat: s.clearcoat ?? 0, clearcoatRoughness: Math.max(MIN_ROUGH, s.clearcoatRough ?? 0.2), sheen: s.sheen ?? 0 })
+    ? new THREE.MeshPhysicalMaterial({
+      ...opts, clearcoat: s.clearcoat ?? 0, clearcoatRoughness: Math.max(MIN_ROUGH, s.clearcoatRough ?? 0.2), sheen: s.sheen ?? 0,
+      sheenRoughness: s.sheenRough ?? 0.5, sheenColor: new THREE.Color(s.sheenColor ?? 0xffffff),
+    })
     : new THREE.MeshStandardMaterial(opts);
   mat.envMapIntensity = (s.env ?? 0.8) * (variant === 'int' ? INTERIOR_ENV : 1);
   mat.userData.castShadow = s.shadow !== false;
+  if (s.emissive !== undefined) {
+    mat.emissive.set(s.emissive);
+    mat.emissiveIntensity = s.glowDay ?? 0;
+    // lamps (shades, opal globes) follow the electric lights; screens and embers glow all the time
+    if (s.glow) { mat.userData.glow = s.glow; mat.userData.glowDay = s.glowDay ?? 0; EMISSIVE_FIXTURES.push(mat); }
+  }
+  if (s.alphaTest && t) {
+    // alpha-tested cards cast leaf-shaped shadows, not rectangles
+    mat.userData.depthMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: t.map, alphaTest: s.alphaTest, side: THREE.DoubleSide });
+  }
   return mat;
 }
 

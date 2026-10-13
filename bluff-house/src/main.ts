@@ -1,5 +1,14 @@
 import * as THREE from 'three';
 import { buildHouse } from './build/house';
+import { siteBlocked } from './build/landscape';
+import { buildTrees, wind } from './build/trees';
+import { buildWorld, LAKE_Y, LOT } from './build/world';
+import { Lake } from './render/lake';
+import { Fire } from './lighting/fire';
+import { buildOutdoorLights } from './lighting/outdoor';
+import { Furniture } from './furniture/furnish';
+import { loadModels } from './furniture/models';
+import { LOOSE_MATERIALS } from './materials/library';
 import { FLOOR_Y, house, squareFootage, validateHouse } from './data/house';
 import { fmtClock } from './lighting/sun';
 import { InteriorLights } from './lighting/interior';
@@ -43,17 +52,48 @@ rig.scene.add(built.root, built.collider);
   console.info(`Built in ${built.stats.ms.toFixed(0)} ms · ${built.stats.tris.toLocaleString()} tris in ${built.stats.buckets} merged meshes · collider ${built.stats.colliderTris.toLocaleString()} tris`);
 }
 
-const player = new PlayerController(built.bvh, built.ctx.dynamic.map((d) => d.blocker));
+// ---- the world beyond the lot: hills, far shore, ridges, the lake and the fall trees ----
+const world = buildWorld(built.terrain);
+rig.scene.add(world.group);
+const lake = new Lake(LAKE_Y);
+rig.scene.add(lake.mesh);
+const inLot = (x: number, z: number) => x > LOT.x0 && x < LOT.x1 && z > LOT.z0 && z < LOT.z1;
+const trees = buildTrees({ height: (x, z) => (inLot(x, z) ? built.terrain.height(x, z) : world.height(x, z)), blocked: siteBlocked(house) });
+rig.scene.add(trees.group);
+console.info(`Landscape: ${trees.count} near trees, mid-distance impostors, far shore at ~1,750 ft, three Blue Ridge ridgelines`);
+
+const furniture = new Furniture(house, built.groups);
+{
+  const fs = furniture.stats();
+  console.info(`Furniture: ${fs.items} items from the JSON in ${fs.meshes} merged meshes (${fs.tris.toLocaleString()} tris), ${fs.blockers} colliders`);
+  for (const r of furniture.report) console.warn('furniture: ' + r);
+}
+const player = new PlayerController(built.bvh, [...built.ctx.dynamic.map((d) => d.blocker), ...furniture.blockers]);
 const tour = new Tour(house.tourStops);
 const director = new Director(player, tour);
 const culler = new LevelCuller(built.groups, built.plan);
 const input = new Input(rig.renderer.domElement);
 const sky = new SkyRig(rig.renderer, rig.scene);
 sky.sky.name = 'sky';
-const interior = new InteriorLights(rig.scene, built.plan);
+const outdoorLights = buildOutdoorLights(house);
+rig.scene.add(outdoorLights.group);
+const interior = new InteriorLights(rig.scene, built.plan, outdoorLights.points);
+// a fire in each main-level firebox (floor center just inside the opening)
+const fire = new Fire(house.openings.filter((o) => o.kind === 'fireplace' && o.level === 1).map((o) => ({ x: o.at + 1.25, y: FLOOR_Y[1] + 1, z: (o.from + o.to) / 2, width: o.to - o.from - 3 })));
+built.groups.get('L1i')!.add(fire.group);
 const post = new Post(rig.renderer, rig.scene, rig.camera, 'agx');
 rig.onResize.push((w, h) => post.setSize(w, h));
 const time = new TimeOfDay(rig, sky, interior, new InteriorEnv(rig.renderer));
+const impostorLight = (trees.group.getObjectByName('trees:impostors') as THREE.Mesh).material as THREE.ShaderMaterial;
+time.outdoor = (deep, haze, dir, sunColor, sunI, skyCol, skyI) => {
+  lake.setLight(deep, haze, dir, sunColor, sunI);
+  // impostors are unlit billboards: give them the same sun + sky light the real trees get
+  impostorLight.uniforms.light.value.copy(sunColor).multiplyScalar(sunI * 0.12 * Math.max(0, dir.y + 0.15)).add(skyCol.clone().multiplyScalar(skyI * 1.6));
+};
+// the mirror pass runs before the post chain (never inside the AO pass); interior furniture is left out of it
+lake.hideInReflection = [...built.groups.values()].filter((g) => g.name !== 'site').flatMap((g) => g.children.filter((c) => c.name.startsWith('furniture:')));
+post.beforeRender = (dt) => lake.render(rig.renderer, rig.scene, rig.camera, dt);
+rig.onResize.push((w, h) => lake.setSize(w, h));
 console.info(`Lights: ${interior.counts.cans} recessed cans, ${interior.counts.clusters} room light clusters, ${interior.counts.windows} daylight glass walls`);
 const caption = new Caption();
 const labels = new RoomLabels(built.bvh, built.opaque);
@@ -64,6 +104,7 @@ function setQuality(q: Quality) {
   const ratio = { auto: 1, high: 1, medium: 0.85, low: 0.75 }[q];
   rig.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5) * ratio);
   post.apply(POST_PRESETS[q === 'auto' ? 'high' : q]);
+  lake.enabled = q !== 'low'; // Low drops the lake reflection (the water shows the sky color)
   const sm = { auto: 4096, high: 4096, medium: 2048, low: 1024 }[q];
   if (rig.sun.shadow.mapSize.x !== sm) {
     rig.sun.shadow.mapSize.set(sm, sm);
@@ -81,9 +122,26 @@ const dock = new Dock({
   onTime: (h) => time.set(h),
   onSizes: () => dock.setSizes(labels.toggle()),
   onMeasure: () => toggleMeasure(),
-  onFurnished: () => dock.toast('Furniture arrives in Stage 4'),
+  onFurnished: () => toggleFurnished(),
   onQuality: (q) => setQuality(q),
 });
+function toggleFurnished() {
+  furniture.setFurnished(!furniture.furnished);
+  dock.setFurnished(furniture.furnished);
+  dock.toast(furniture.furnished ? 'Furnished' : 'Empty · built-ins stay');
+}
+const _ray = new THREE.Raycaster();
+/** Click a sofa, bed, chair or rug to cycle its finish (only if no wall is in front of it). */
+function stageClick(nx: number, ny: number): boolean {
+  _ray.setFromCamera(new THREE.Vector2(nx, ny), rig.camera);
+  const hit = furniture.pick(_ray.ray, 40);
+  if (!hit) return false;
+  const wall = built.bvh.raycastFirst(_ray.ray, THREE.DoubleSide);
+  if (wall && wall.distance < hit.dist - 0.5 && built.opaque[wall.faceIndex!]) return false;
+  const label = furniture.cycle(hit.item);
+  if (label) dock.toast(`${hit.item.name} · ${label}`);
+  return true;
+}
 function toggleMeasure() {
   const on = measure.toggle();
   dock.setMeasure(on);
@@ -102,13 +160,14 @@ input.on('Space', () => { if (measure.on) toggleMeasure(); director.toggle(); })
 input.on('KeyR', () => director.resume());
 input.on('KeyL', () => dock.setSizes(labels.toggle()));
 input.on('KeyM', toggleMeasure);
-input.on('KeyF', () => dock.toast('Furniture arrives in Stage 4'));
+input.on('KeyF', () => toggleFurnished());
 input.on('KeyT', () => time.nextPreset());
 input.on('KeyH', () => dock.toggleHint());
 input.on('Escape', () => { if (measure.on) toggleMeasure(); });
 input.onUnlock = () => { if (measure.on) measure.cancel(); };
 input.onCanvasClick = (nx, ny) => {
   if (measure.on) { measure.click(rig.camera, nx, ny); return true; }
+  if (stageClick(nx, ny)) return true;
   director.pause(); // clicking the view takes over: free walk from here
   return false;
 };
@@ -131,8 +190,12 @@ function step(dt: number) {
     if (Math.abs(d.blocker.rot - before) > 1e-4) rig.renderer.shadowMap.needsUpdate = true; // the bookcase door's shadow
   }
   culler.update(player.x, player.z, player.feet);
+  furniture.update(dt);
+  if (furniture.shadowsDirty) { furniture.shadowsDirty = false; rig.renderer.shadowMap.needsUpdate = true; }
   director.apply(rig.camera);
   time.tick(dt, culler.inside);
+  wind.time.value += dt;
+  fire.update(dt);
   interior.update(rig.camera.position, player.feet, culler.inside, dt);
   post.exposure.exposure = time.exposure;
   caption.update(whereAt(built.plan, player.x, player.z, player.feet), dt);
@@ -165,6 +228,10 @@ post.exposure.exposure = time.exposure;
 rig.renderer.shadowMap.needsUpdate = true;
 rig.resize();
 rig.renderer.compile(rig.scene, rig.camera); // shader warm-up behind the loader
+// …including the see-through variants the Furnished fade uses, so toggling F never hitches
+for (const m of LOOSE_MATERIALS) m.transparent = true;
+rig.renderer.compile(rig.scene, rig.camera);
+for (const m of LOOSE_MATERIALS) m.transparent = false;
 post.render(0);
 const loader = document.getElementById('loader')!;
 (document.getElementById('loaderBar') as HTMLElement).style.width = '100%';
@@ -178,5 +245,7 @@ function renderSettled() {
   rig.renderer.shadowMap.needsUpdate = true;
   post.render(0);
 }
-if (TEST) installTestApi({ rig, built, player, culler, director, tour, time, caption, labels, measure, step, post, interior, renderSettled, squareFootage: sf });
+// downloaded furniture models (if any) replace their stand-ins as they arrive
+void loadModels(furniture).then((n) => { if (n) console.info(`Furniture: ${n} downloaded models in place of their stand-ins`); });
+if (TEST) installTestApi({ rig, built, furniture, lake, player, culler, director, tour, time, caption, labels, measure, step, post, interior, renderSettled, squareFootage: sf });
 else rig.renderer.setAnimationLoop(frame);

@@ -5,7 +5,7 @@ import * as THREE from 'three';
  * haze is thickest down over the lake (y ≈ −50) and thins out with altitude. Uses FogExp2's
  * density and color, which the time-of-day rig drives. Call before any material compiles.
  */
-export function installHeightFog(opts = { lakeY: -50, scaleHeight: 140 }) {
+export function installHeightFog(opts = { lakeY: -50, scaleHeight: 140, haze: 0.12 }) {
   const C = THREE.ShaderChunk as unknown as Record<string, string>;
   C.fog_pars_vertex = /* glsl */ `
 #ifdef USE_FOG
@@ -38,8 +38,11 @@ export function installHeightFog(opts = { lakeY: -50, scaleHeight: 140 }) {
   float fogDist = length( vFogWorld - cameraPosition );
   #ifdef FOG_EXP2
     // integrate an exponential height profile along the view ray (closed form, average height)
-    float fogH = max( 0.0, 0.5 * ( vFogWorld.y + cameraPosition.y ) - ${opts.lakeY.toFixed(1)} );
+    // (abs: the lake's mirror camera sits below the water; its rays really start at the mirrored height)
+    float fogH = max( 0.0, 0.5 * ( ( vFogWorld.y - ${opts.lakeY.toFixed(1)} ) + abs( cameraPosition.y - ${opts.lakeY.toFixed(1)} ) ) );
     float fogFactor = 1.0 - exp( - fogDensity * fogDist * exp( - fogH / ${opts.scaleHeight.toFixed(1)} ) );
+    // plus plain distance haze (aerial perspective), so far ridges fade blue even high above the fog
+    fogFactor = 1.0 - ( 1.0 - fogFactor ) * exp( - fogDensity * ${opts.haze.toFixed(3)} * fogDist );
   #else
     float fogFactor = smoothstep( fogNear, fogFar, fogDist );
   #endif

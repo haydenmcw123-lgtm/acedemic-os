@@ -1,4 +1,4 @@
-tour: 1053 ft in 6.44 min (fixed 1/30 s step), completed: true
+tour: 1056 ft in 6.46 min (fixed 1/30 s step), completed: true
 capsule overlaps with walls/rails/glass: 0 steps
 largest camera move per step: 0.183 ft; largest turn per step: 0.057 rad
 rooms visited: 30/30

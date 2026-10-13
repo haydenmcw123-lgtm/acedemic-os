@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { house } from '../data/house';
-import { material } from '../materials/library';
 import { SHADOW_TARGET, type RenderRig } from '../render/renderer';
 import type { InteriorLights } from './interior';
 import type { InteriorEnv } from './interiorEnv';
@@ -45,6 +44,9 @@ export class TimeOfDay {
   private shadowDirty = true;
   private dir = new THREE.Vector3();
   onChange: (h: number) => void = () => {};
+  /** Outdoor consumers (the lake, tree impostors): deep water color, haze, sun and sky light. */
+  outdoor: ((lake: THREE.Color, haze: THREE.Color, sunDir: THREE.Vector3, sunColor: THREE.Color, sunI: number, sky: THREE.Color, skyI: number) => void) | null = null;
+  readonly lakeColor = new THREE.Color();
 
   private envArgs: Parameters<InteriorEnv['set']> | null = null;
   private envTimer = 0;
@@ -70,8 +72,8 @@ export class TimeOfDay {
     haze(el, fog.color);
     fog.density = 0.00032 + 0.0003 * (1 - sstep(-2, 12, el)); // a little hazier at the ends of the day
     hemi.color.copy(fog.color).lerp(new THREE.Color(0.55, 0.68, 0.85), 0.5);
-    const lake = material('lake') as THREE.MeshStandardMaterial;
-    lake.color.setRGB(0.012, 0.03, 0.035).multiplyScalar(0.25 + 0.75 * day);
+    this.lakeColor.setRGB(0.012, 0.03, 0.035).multiplyScalar(0.25 + 0.75 * day);
+    this.outdoor?.(this.lakeColor, fog.color, this.dir, sun.color, sun.intensity, hemi.color, hemi.intensity);
     const it = this.interior;
     it.daylight = day;
     it.daylightColor.copy(fog.color).lerp(new THREE.Color(0.8, 0.86, 0.95), 0.5);

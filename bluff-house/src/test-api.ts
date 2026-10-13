@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import type { Furniture } from './furniture/furnish';
+import type { Lake } from './render/lake';
 import type { BuiltHouse } from './build/house';
 import { levelOfFeet } from './data/house';
 import { PLAYER, type MoveInput, type PlayerController } from './player/controller';
@@ -18,6 +20,8 @@ import type { RenderRig } from './render/renderer';
 interface Deps {
   rig: RenderRig;
   built: BuiltHouse;
+  furniture: Furniture;
+  lake: Lake;
   player: PlayerController;
   culler: LevelCuller;
   director: Director;
@@ -42,7 +46,7 @@ export function installTestApi(d: Deps) {
   const setSize = (w: number, h: number) => {
     rig.renderer.setPixelRatio(1);
     rig.renderer.setSize(w, h, false); rig.camera.aspect = w / h; rig.camera.updateProjectionMatrix();
-    d.post.setSize(w, h);
+    d.post.setSize(w, h); d.lake.setSize(w, h);
   };
   const state = () => {
     const L = levelOfFeet(player.feet);
@@ -285,6 +289,132 @@ export function installTestApi(d: Deps) {
       }
       return { same: false, url: filmCanvas.toDataURL('image/jpeg', 0.93) };
     },
+    /** Every placed item (world footprint, size, flags) plus the fit report. */
+    furnitureInfo() {
+      const f = d.furniture;
+      return {
+        stats: f.stats(), report: f.report,
+        items: f.items.map((it) => ({ id: it.id, name: it.name, room: it.room, level: it.level, builtIn: it.builtIn, x: it.x, z: it.z, y: it.y, rot: it.rot, size: it.size, staging: it.staging, stretch: it.stretch, collides: !!it.blocker, roles: { ...it.roles } })),
+      };
+    },
+    /**
+     * Runs the tour (fixed step) and lists every furniture item whose collider comes within
+     * `clear` ft of the 1-ft capsule's center path (the clearance rule: nothing across a tour path).
+     */
+    tourFurnitureConflicts(clear = PLAYER.radius, dt = 1 / 30) {
+      const f = d.furniture, out = new Map<number, { id: number; name: string; room: string; s: number; gap: number; at: [number, number] }>();
+      d.director.restart();
+      for (let t = 0; t < 1200 && d.director.mode === 'tour'; t += dt) {
+        d.step(dt);
+        for (const it of f.items) {
+          const b = it.blocker;
+          if (!b || b.y1 < player.feet + PLAYER.stepUp || b.y0 > player.feet + PLAYER.height) continue;
+          const c = Math.cos(b.rot), sn = Math.sin(b.rot), wx = player.x - b.cx, wz = player.z - b.cz;
+          const lx = wx * c - wz * sn, lz = wx * sn + wz * c;
+          const gap = Math.hypot(Math.max(0, Math.abs(lx) - b.hw), Math.max(0, Math.abs(lz) - b.hd));
+          if (gap < clear) {
+            const prev = out.get(it.id);
+            if (!prev || gap < prev.gap) out.set(it.id, { id: it.id, name: it.name, room: it.room, s: +d.tour.s.toFixed(1), gap: +gap.toFixed(2), at: [+player.x.toFixed(1), +player.z.toFixed(1)] });
+          }
+        }
+      }
+      return [...out.values()];
+    },
+    /**
+     * The staging clearance rules, measured on the placed furniture:
+     *  - every doorway keeps a clear path min(3 ft, door width) wide, 3 ft deep on both sides;
+     *  - no furniture box intersects a wall (0.06 ft tolerance for pieces mounted flush);
+     *  - art hangs within 0.2 ft of a solid wall and never over an opening.
+     * Returns the problems found (empty = pass) plus counts of what was checked.
+     */
+    clearance() {
+      const f = d.furniture, data = built.ctx.data, problems: string[] = [];
+      const DOORS = new Set(['door', 'gdoor', 'front', 'fold', 'glassdoor', 'slide', 'bookcase', 'open']);
+      // oriented footprint corners of an item, shrunk by `s`
+      const corners = (it: (typeof f.items)[number], sh = 0) => {
+        const c = Math.cos(it.rot), sn = Math.sin(it.rot), hw = it.size[0] / 2 - sh, hd = it.size[2] / 2 - sh;
+        return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([lx, lz]) => [it.x + lx * c + lz * sn, it.z - lx * sn + lz * c] as [number, number]);
+      };
+      // separating-axis test between a convex quad and an axis-aligned rectangle
+      const quadHitsRect = (q: [number, number][], x0: number, z0: number, x1: number, z1: number) => {
+        const rect: [number, number][] = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+        for (const poly of [q, rect]) for (let i = 0; i < 4; i++) {
+          const [ax, az] = poly[i], [bx, bz] = poly[(i + 1) % 4], nx = bz - az, nz = ax - bx;
+          let amin = Infinity, amax = -Infinity, bmin = Infinity, bmax = -Infinity;
+          for (const [x, z] of q) { const v = x * nx + z * nz; amin = Math.min(amin, v); amax = Math.max(amax, v); }
+          for (const [x, z] of rect) { const v = x * nx + z * nz; bmin = Math.min(bmin, v); bmax = Math.max(bmax, v); }
+          if (amax <= bmin + 1e-6 || bmax <= amin + 1e-6) return false;
+        }
+        return true;
+      };
+      const floorOf = (it: (typeof f.items)[number]) => (it.level < 0 ? it.y : [0, 11, 22][it.level]);
+      const standing = f.items.filter((it) => it.size[1] >= 0.5 && it.y - floorOf(it) < 1.5); // not rugs, not wall-mounted
+      // 1) doorways: a 3-ft-wide path (narrower doors: their full width), 3 ft deep on both sides.
+      //    On a wide slider or garage door, any 3-ft window across the opening counts.
+      let doors = 0;
+      for (const o of data.openings) {
+        if (!DOORS.has(o.kind)) continue;
+        doors++;
+        const fy = [0, 11, 22][o.level], half = Math.min(1.5, (o.to - o.from) / 2);
+        const blockers = standing.filter((it) => !(it.y > fy + 6.5 || it.y + it.size[1] < fy + 0.1));
+        let clear = false, firstBlock: string[] = [];
+        for (let mid = o.from + half; mid <= o.to - half + 1e-6 && !clear; mid += 0.25) {
+          const [x0, z0, x1, z1] = o.axis === 'x' ? [o.at - 3, mid - half, o.at + 3, mid + half] : [mid - half, o.at - 3, mid + half, o.at + 3];
+          const hit = blockers.filter((it) => quadHitsRect(corners(it, 0.02), x0, z0, x1, z1));
+          if (!hit.length) clear = true; else if (!firstBlock.length) firstBlock = hit.map((it) => `${it.name} (${it.room})`);
+        }
+        if (!clear) problems.push(`doorway: ${firstBlock.join(', ')} block${firstBlock.length > 1 ? '' : 's'} the ${o.kind} at ${o.axis}=${o.at} [${o.from}–${o.to}], level ${o.level}`);
+      }
+      // 2) walls (with the push that would clear each piece, used to fix the data)
+      const fixes: { id: number; name: string; room: string; x: number; z: number; dx: number; dz: number }[] = [];
+      for (const it of f.items) {
+        const q = corners(it, 0.06);
+        for (const w of built.ctx.wallPieces) {
+          if (w.y1 <= it.y + 0.05 || w.y0 >= it.y + it.size[1] - 0.05) continue;
+          const [x0, z0, x1, z1] = w.axis === 'x' ? [w.at - 0.25, w.s, w.at + 0.25, w.e] : [w.s, w.at - 0.25, w.e, w.at + 0.25];
+          if (!quadHitsRect(q, x0, z0, x1, z1)) continue;
+          problems.push(`wall: ${it.name} (${it.room}) at ${it.x}, ${it.z} intersects the wall ${w.axis}=${w.at} [${w.s}–${w.e}]`);
+          const full = corners(it), xs = full.map((p) => p[0]), zs = full.map((p) => p[1]);
+          let dx = 0, dz = 0;
+          if (w.axis === 'x') dx = it.x < w.at ? w.at - 0.26 - Math.max(...xs) : w.at + 0.26 - Math.min(...xs);
+          else dz = it.z < w.at ? w.at - 0.26 - Math.max(...zs) : w.at + 0.26 - Math.min(...zs);
+          fixes.push({ id: it.id, name: it.name, room: it.room, x: it.x, z: it.z, dx: +dx.toFixed(3), dz: +dz.toFixed(3) });
+          break;
+        }
+      }
+      // 3) art: back face flush (≤ 0.2 ft) on solid, opaque wall everywhere across its width
+      const ray = new THREE.Ray(), dir = new THREE.Vector3();
+      let art = 0;
+      for (const it of f.items.filter((i) => i.name === 'Art')) {
+        art++;
+        const c = Math.cos(it.rot), sn = Math.sin(it.rot);
+        dir.set(-sn, 0, -c); // the back of the frame (local -z)
+        const hd = it.size[2] / 2;
+        for (const u of [-0.45, 0, 0.45]) for (const v of [0.2, 0.5, 0.8]) {
+          const lx = u * it.size[0];
+          ray.origin.set(it.x + lx * c + hd * sn * 0 - dir.x * 0, it.y + v * it.size[1], it.z - lx * sn);
+          ray.origin.addScaledVector(dir, hd - 0.01); // start just inside the back face
+          ray.origin.addScaledVector(dir, -0.3); // …and step back so a slightly embedded frame still finds its wall
+          ray.direction.copy(dir);
+          const hit = built.bvh.raycastFirst(ray, THREE.DoubleSide);
+          const gap = hit ? hit.distance - 0.3 : Infinity;
+          if (!hit || gap > 0.2 || !built.opaque[hit.faceIndex!]) { problems.push(`art: ${it.name} (${it.room}) at ${it.x}, ${it.z}: ${hit ? (built.opaque[hit.faceIndex!] ? `${gap.toFixed(2)} ft off the wall` : 'over glass') : 'no wall behind it'} at u=${u}, v=${v}`); break; }
+        }
+      }
+      return { problems, fixes, doors, art, items: f.items.length, walls: built.ctx.wallPieces.length };
+    },
+    setFurnished(on: boolean, animate = false) { d.furniture.setFurnished(on, animate); },
+    furnitureState() {
+      const f = d.furniture, loose = f.items.filter((i) => !i.builtIn), built = f.items.filter((i) => i.builtIn);
+      return {
+        furnished: f.furnished, fade: f.fadeLevel,
+        looseVisible: f.looseMeshes.filter((m) => m.visible).length, looseMeshes: f.looseMeshes.length,
+        looseBlockersOn: loose.filter((i) => i.blocker?.enabled).length, builtInBlockersOn: built.filter((i) => i.blocker?.enabled).length,
+        opacity: (f.looseMeshes[0]?.material as THREE.Material | undefined)?.opacity ?? 1,
+      };
+    },
+    /** Cycles an item's finish (staging) and returns the new label. */
+    cycleItem(id: number) { return d.furniture.cycle(d.furniture.items[id]); },
     info() { return { calls: rig.renderer.info.render.calls, tris: rig.renderer.info.render.triangles }; },
     /** Runs level culling for the current position and reports which interior groups are drawn. */
     culling() {

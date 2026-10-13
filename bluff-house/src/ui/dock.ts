@@ -55,8 +55,8 @@ export class Dock {
     this.sizesBtn.innerHTML = 'Room sizes <kbd>L</kbd>';
     this.measureBtn.innerHTML = 'Measure <kbd>M</kbd>';
     this.furnBtn.innerHTML = 'Furnished <kbd>F</kbd>';
-    this.furnBtn.disabled = true;
-    this.furnBtn.title = 'Furniture arrives in Stage 4';
+    this.furnBtn.title = 'Furnished ↔ Empty · click a sofa, bed, chair or rug to change its finish';
+    this.furnBtn.setAttribute('aria-pressed', 'true');
     this.sizesBtn.addEventListener('click', h.onSizes);
     this.measureBtn.addEventListener('click', h.onMeasure);
     this.furnBtn.addEventListener('click', h.onFurnished);
@@ -78,7 +78,7 @@ export class Dock {
         <div><kbd>Space</kbd> pause tour · walk</div><div><kbd>W A S D</kbd> move</div>
         <div><kbd>Shift</kbd> sprint</div><div><kbd>R</kbd> resume tour</div>
         <div><kbd>L</kbd> room sizes</div><div><kbd>M</kbd> measure</div>
-        <div><kbd>F</kbd> furnished</div><div><kbd>T</kbd> next time of day</div>
+        <div><kbd>F</kbd> furnished · empty</div><div><kbd>Click</kbd> sofa/bed/rug finish</div><div><kbd>T</kbd> next time of day</div>
         <div><kbd>H</kbd> this card</div><div><kbd>Esc</kbd> release mouse · cancel</div>
       </div>`;
     this.hint.hidden = true;
@@ -92,6 +92,7 @@ export class Dock {
   setTime(h: number) { this.time.value = String(h); this.timeVal.textContent = fmtClock(h); }
   setSizes(on: boolean) { this.sizesBtn.setAttribute('aria-pressed', String(on)); }
   setMeasure(on: boolean) { this.measureBtn.setAttribute('aria-pressed', String(on)); }
+  setFurnished(on: boolean) { this.furnBtn.setAttribute('aria-pressed', String(on)); }
   setQuality(q: Quality) { this.quality.value = q; }
   toggleHint() { this.hint.hidden = !this.hint.hidden; }
 

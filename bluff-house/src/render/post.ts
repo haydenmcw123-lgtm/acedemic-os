@@ -102,6 +102,8 @@ export class Post {
     this.aa.enabled = s.smaa;
   }
 
+  /** Runs before the chain each frame (the lake's mirror pass), never inside it. */
+  beforeRender: ((dt: number) => void) | null = null;
   setSize(w: number, h: number) { this.composer.setSize(w, h); }
-  render(dt?: number) { this.composer.render(dt); }
+  render(dt?: number) { this.beforeRender?.(dt ?? 0); this.composer.render(dt); }
 }

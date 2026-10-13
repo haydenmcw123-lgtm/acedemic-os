@@ -1,14 +1,14 @@
 # Bluff House walkthrough: progress
 
-## Status: Stage 3 (Materials + realtime lighting) done, waiting for approval
+## Status: Stage 4 (Furniture + exterior) done, waiting for approval
 
 | Stage | Status |
 |---|---|
 | 1. Skeleton (clay geometry, collisions, stairs, level culling) | ✅ approved, proof in `proof/stage1/` |
 | 2. Tour + UI | ✅ approved, proof in `proof/stage2/` |
-| 3. Materials + realtime lighting | ✅ done, proof in `proof/stage3/` |
-| 4. Furniture + exterior | ⏳ next |
-| 5. Baked GI + reflection probes | — |
+| 3. Materials + realtime lighting | ✅ approved, proof in `proof/stage3/` |
+| 4. Furniture + exterior | ✅ done, proof in `proof/stage4/` |
+| 5. Baked GI + reflection probes | ⏳ next |
 | 6. Performance + polish | — |
 | 7. Ship | — |
 
@@ -114,9 +114,63 @@
 - `proof/stage3/tonemap-agx-left-aces-right.jpg`: AgX keeps the great-room glass readable at golden hour, while ACES blows it out. ACES is punchier at night.
 - `tests/baselines/stage3/`: these frames at 640×360 become the approved baselines once you OK this stage. Later stages fail if a view changes by more than MAE 6/255 without re-approval.
 
-## Next (Stage 4: furniture + exterior)
+## Stage 4: what was built
 
-- Furniture from `furnitureByRoom` (the Furnished toggle), the bluff planting and rock, the far shore, landscape lighting and the fire in the firebox.
+- **Furniture (all 155 items from `furnitureByRoom`)** (`src/furniture/`):
+  - `catalog.ts` maps every item name to a parametric model, ported from the reference prototype's builders (the JSON sizes were measured from them). Each model has material *roles* (upholstery, wood, rug), so finishes can change without rebuilding.
+  - `furnish.ts` fits each model exactly to its `size` box and logs anything that needs more than 15% non-uniform scale. The four builders it first flagged were fixed: now 0 of 155.
+  - Pieces are merged by level × material: about 40–60 draw calls per floor for all furniture. Books and wine bottles are instanced.
+  - Colliders: an oriented box per piece. Plants collide only at the pot and the umbrella only at its pole. Rugs, art and wall-mounted pieces don't collide.
+- **Staging:**
+  - **F** (or the dock button) fades the loose furniture out and back in over 400 ms. Built-ins (cabinets, islands, vanities, closets, bookcases, the fireplace) always stay. When empty, you can walk where the furniture was.
+  - **Click** a sofa, bed, chair or stool to cycle Linen → Leather → Bouclé, or a rug through Natural wool → Flat-weave stripe → Kilim. A wall in front of the piece blocks the click.
+- **The world beyond the lot** (`src/build/world.ts`):
+  - A long lake between our bluff and the far shore, about 1,750 ft west.
+  - Wooded hills: our side climbs gently away from the house, the far side rises 300–1,300 ft.
+  - Fall color painted per vertex (burnt orange, red maple, gold hickory, russet, evergreens on the high ground) under a canopy texture.
+  - Three rings of Blue Ridge silhouettes at 7,500–11,500 ft.
+  - A distance haze joins the height fog, so the far ridges fade blue.
+- **Lake** (`src/render/lake.ts`):
+  - A planar mirror at half resolution, rendered once per frame before the post chain (so the AO pass never triggers it), with interior furniture hidden.
+  - Two scrolling ripple normal maps and a slow swell, Fresnel mixed with the deep-water color, and a sun glint.
+  - Quality Low turns the reflection off.
+- **Trees** (`src/build/trees.ts`):
+  - ~260 near trees, instanced per species: red maple, orange oak, gold hickory and white pine. Each has 130–170 alpha-tested leaf cards that sway in the wind (vertex shader) and cast leaf-shaped shadows (a matching depth material).
+  - 1,800 camera-facing impostors from 300 to 1,000 ft.
+  - 70 boulders on the bluff.
+  - Nothing grows on the house, decks, pool, drive, bluff stairs or dock (all from the JSON). Below the house, trees are kept under the main-level sightline so the lake view stays open.
+- **Fire and outdoor lights** (`src/lighting/fire.ts`, `outdoor.ts`):
+  - A wood fire in the great-room firebox: logs, an ember bed, animated noise-shader flames that bloom, and a flickering firelight.
+  - Infrared heaters under the covered deck, sconces on the entry piers, step lights along the bluff stairs, lanterns on the dock and lights in the pool.
+  - Six outdoor light clusters join the shared light pool, so the nearest ones light the ground after dark.
+- **Assets** (`scripts/fetch-assets.ts`, `pnpm assets`):
+  - Queries the Poly Haven and ambientCG APIs, downloads, compresses with glTF-Transform, and writes `public/models/manifest.json`.
+  - At startup the app swaps each stand-in for its downloaded model, fitted to the same box.
+  - Here the hosts are blocked, so it wrote `assets/MANUAL-DOWNLOADS.md` instead. `CREDITS.md` lists everything.
+
+## Stage 4 proof (`pnpm test`: all passing)
+
+- `proof/stage4/contact-sheet.jpg`: the 10 fixed views plus **view 11, the house from the water**, at Noon / Golden / Night. Full-size frames are in `proof/stage4/views/`.
+- `proof/stage4/health.csv`: **0 Inf/NaN pixels** in all 33 frames, and clipping **≤ 0.2%**.
+  - **~490k triangles** outdoors (budget 1.5M).
+  - **139–257 draw calls inside** (budget 250: the foyer and kitchen are 5–7 over; see Known issues).
+  - **288–299 outside** (budget 400).
+- `tests/clearance.spec.ts` → `proof/stage4/clearance.txt`, checking 27 doorways, 221 wall pieces, 3 pieces of art and the whole tour:
+  - **every doorway** keeps a clear 3-ft path, 3 ft deep on both sides;
+  - **no furniture box** intersects a wall;
+  - **art** hangs within 0.2 ft of a solid wall, never over an opening;
+  - **no furniture collider** comes within 1 ft of the tour path.
+- `tests/tour.spec.ts` (with furniture colliders on): the tour completes with **0 contacts** with walls, rails, glass or furniture.
+- `tests/staging.spec.ts`:
+  - the F fade is halfway at 200 ms and done at 400 ms;
+  - loose colliders turn off while 30+ built-in colliders stay;
+  - the finish cycles are checked.
+  - Screenshots: `furnished-left-empty-right.jpg`, `finishes-linen-leather-boucle.jpg`.
+- `CREDITS.md` is complete for what ships today: everything is generated in code, plus the four code libraries and the font.
+
+## Next (Stage 5: baked GI + reflection probes)
+
+- The Blender bake pipeline, three blended lightmaps, box-projected probes. Before/after shots of the great room, kitchen and primary bedroom.
 
 ## Walkthrough video (`tests/record.spec.ts`)
 
@@ -171,13 +225,32 @@
 18. **Recessed cans:** each can is an emissive disc that blooms. The "soft pool" under them comes from the pooled room lights (2.2 ft below the ceiling), not one light per can. 100+ real lights would be too many; Stage 5's bake gives each can its true pool.
 19. **Camera 10 (house from the dock).** The dock sits under a boathouse roof, and the ~56-ft, ~50° bluff hides everything below the top floor from the water's edge. The shot is taken from the foot of the bluff stairs, where only the top of the house clears the crest. **Proposal:** add an 11th view "house from the water" (a boat-height camera ~150 ft out) as the hero exterior.
 
+### Stage 4 decisions
+
+20. **Parametric furniture instead of downloaded CC0 models.** Poly Haven, Kenney, Quaternius, Sketchfab and ambientCG are all blocked here.
+    - As the spec allows, I listed exact pages and API URLs (`assets/MANUAL-DOWNLOADS.md`) and continued with stand-ins.
+    - The stand-ins are the prototype's builders, fitted exactly to the JSON sizes.
+    - `pnpm assets` (or a manual download plus `pnpm assets --local`) swaps real models in with no code changes.
+21. **Data changes for the clearance rule** (all in `house-data.json`):
+    - **Tour stops:** 19 moved (by up to ~1.5 ft) and 2 added (around the sink island's end), so the 2-ft capsule clears every chair, stool, toilet and bed. Every dwell keeps its timing and look-at; four dwell spots (wine room, powder room, Bedroom 2, bar) stand 0.6–1.4 ft from where they were.
+    - **Built-ins:** 32 nudged 0.1–0.54 ft off the walls they penetrated. The prototype placed them against wall centerlines, not wall faces.
+    - **Doorways:** 6 pieces moved out of doorway paths.
+    - **Bar stools:** tucked 0.55 ft under the counter overhang.
+    - **The dog wash** moved from the mudroom's east wall to its west wall, beside the lockers. Between the mudroom's two doors it blocked one 3-ft doorway path or the other in either orientation. It's the only item that moved more than the kit test's 1.7 ft, and it's listed as a named exception in `tests/data.spec.ts`.
+22. **Doorway clearance rule as implemented:** a path min(3 ft, door width) wide, 3 ft deep on both sides of the wall. On a slider, folding wall or garage door, any 3-ft window across the opening counts.
+23. **View 11, the house from the water,** was added to the fixed views, as proposed in Stage 3. View 4 (kitchen) moved east of the sink island so the islands and the lake are both in frame.
+24. **Lake reflection skips interior furniture** (as the spec says). Lit windows and the architecture still reflect.
+25. **The far hills are a vertex-colored canopy heightfield, not individual trees.** Real trees go out to 300 ft, impostors to 1,000 ft, and the canopy beyond. Optional cloud shadows are not done.
+
 ## Known issues (to fix in later stages)
 
 - The terrain is a 2-ft grid, so a 2-ft sloped "trench" shows outside buried lower-level walls (Stage 4: finer grid near the house).
 - Quality "Auto" equals "High" until the adaptive system in Stage 6. Medium and Low already change the pixel ratio and shadow-map size.
 - The loader bar is honest but trivial for now: there are no downloaded assets until Stage 4.
 - Some interior light leaks: the RectAreaLights and point lights have no shadows, so a little daylight or lamplight reaches surfaces it shouldn't (Stage 5's bake fixes this).
-- The bluff is plain grass, there's no far shore yet, and the firebox has no fire (Stage 4).
-- At night the view from the dock is almost black: there are no landscape or stair lights yet (Stage 4).
+- **Draw calls inside are 5–7 over budget in two views** (foyer 255, kitchen 257 vs 250): trees and landscape seen through the glass add ~20. Stage 6 will merge the outdoor fixtures, put trees on a distance/visibility switch from inside, and add LODs.
+- The trees are stylized (procedural leaf cards), not photo-scanned glTF trees, and the canopy texture repeats visibly on the far hills up close.
+- From the dock at night the bluff is mostly dark apart from the step lights. That's realistic, but a moon or more landscape light would read better.
+- Downloaded models swap in automatically, but their per-model materials won't merge, so each one adds draw calls (Stage 6 merges them).
 - Headless frame rates are SwiftShader (software) numbers and say nothing about real GPU speed.
 - The interior draw-call counts include the shadow pass and stay under 250. They will grow with furniture (Stage 4).

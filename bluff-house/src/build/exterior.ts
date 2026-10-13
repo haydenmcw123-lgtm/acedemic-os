@@ -205,9 +205,5 @@ export function buildExterior(ctx: BuildContext, groundAt: (x: number, z: number
     railing(ctx, 'z', rz1, -88, rx1 + 0.5, dy, 'site');
     railing(ctx, 'x', rx1 + 0.5, rz0 + 6, rz1, dy, 'site');
   }
-  // ---- lake ----
-  {
-    const y = s.lake.y;
-    g.quad('site', 'lake', [-6000, y, 6000], [-40, y, 6000], [-40, y, -6000], [-6000, y, -6000], false);
-  }
+  // ---- lake: see render/lake.ts (planar reflection) ----
 }

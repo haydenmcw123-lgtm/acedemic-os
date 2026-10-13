@@ -117,7 +117,8 @@ test('the bluff stairs lead all the way down to the dock', async () => {
 });
 
 test('doors are passable: narrowest pocket door, front pivot doors, bookcase door', async () => {
-  const powder = await app(page, (a) => { a.teleport(14, 58.25, 11); return a.walkTo(21.5, 58.25, 10, 0.4); });
+  // through the 2.5-ft powder door to just inside the room (the toilet stands further in since Stage 4)
+  const powder = await app(page, (a) => { a.teleport(14, 58.25, 11); return a.walkTo(19.6, 58.0, 10, 0.4); });
   expect(powder.reached).toBe(true); expect(powder.room).toBe('powder');
   const front = await app(page, (a) => { a.teleport(66, 11, 11); return a.walkTo(48, 11, 15, 0.5); });
   expect(front.reached).toBe(true); expect(front.room).toBe('foyer'); expect(front.overlaps).toBe(0);

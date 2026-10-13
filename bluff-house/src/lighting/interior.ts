@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import type { Plan } from '../build/plan';
 import { levelOfFeet } from '../data/house';
-import { material } from '../materials/library';
+import { EMISSIVE_FIXTURES, material } from '../materials/library';
 import { fixtures, type LightPoint, type WindowLight } from './fixtures';
 
 /** Correlated color temperature → linear RGB (Tanner Helland's fit), for 2700 K lamps. */
@@ -37,10 +37,10 @@ export class InteriorLights {
   readonly daylightColor = new THREE.Color(1, 1, 1);
   sunBoost = new THREE.Vector3();
 
-  constructor(scene: THREE.Scene, plan: Plan) {
+  constructor(scene: THREE.Scene, plan: Plan, extra: LightPoint[] = []) {
     RectAreaLightUniformsLib.init();
     const f = fixtures(plan);
-    this.points = f.points;
+    this.points = [...f.points, ...extra];
     this.windows = f.windows;
     for (let i = 0; i < POOL; i++) {
       const l = new THREE.PointLight(LAMP, 0, 20, 2);
@@ -114,6 +114,7 @@ export class InteriorLights {
     this.lightsOn = v;
     const m = this.cans.material as THREE.MeshStandardMaterial;
     m.emissive.copy(LAMP);
-    m.emissiveIntensity = 28 * v;
+    // every lamp-like emissive (cans, shades, globes) follows the switch, each at its own brightness
+    for (const f of EMISSIVE_FIXTURES) f.emissiveIntensity = (f.userData.glowDay ?? 0) + (f.userData.glow ?? 28) * v;
   }
 }

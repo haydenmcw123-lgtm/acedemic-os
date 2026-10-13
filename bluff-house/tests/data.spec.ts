@@ -22,6 +22,14 @@ test('square footage matches the kit summary (7,224 heated)', () => {
   expect([0, 1, 2].map(area)).toEqual(kit.summary.out.map((o: { area: number }) => o.area));
 });
 
+/**
+ * Deliberate relocations (Stage 4 clearance rule), each with its reason. Everything else stays within
+ * 1.7 ft of the kit; small nudges off walls and out of doorways are within that.
+ */
+const RELOCATED: Record<string, string> = {
+  'Dog wash': 'between the mudroom\'s two doors it blocked one 3-ft doorway path or the other in either orientation; moved to the west wall beside the lockers',
+};
+
 test('the same 155 furniture items, in the same rooms, with the same sizes and rotations', () => {
   const k = Object.entries(kit.furnitureByRoom).flatMap(([rk, v]: [string, any]) => v.map((it: any) => ({ ...it, room: rk.split(':')[1] })));
   const o = Object.entries(ours.furnitureByRoom).flatMap(([room, v]: [string, any]) => v.map((it: any) => ({ ...it, room })));
@@ -30,12 +38,17 @@ test('the same 155 furniture items, in the same rooms, with the same sizes and r
   const problems: string[] = [];
   for (const a of k) {
     let best = -1, bd = Infinity;
-    o.forEach((b, j) => { if (!used.has(j) && b.name === a.item) { const dd = Math.hypot(a.x - b.x, a.z - b.z); if (dd < bd) { bd = dd; best = j; } } });
+    // nearest unused item with the same name, preferring one of the same size (base vs upper cabinets share a spot)
+    const sameSize = (b: any) => a.size.every((s: number, i: number) => Math.abs(s - b.size[i]) <= 0.15);
+    for (const strict of [true, false]) {
+      if (best >= 0) break;
+      o.forEach((b, j) => { if (!used.has(j) && b.name === a.item && (!strict || sameSize(b))) { const dd = Math.hypot(a.x - b.x, a.z - b.z); if (dd < bd) { bd = dd; best = j; } } });
+    }
     if (best < 0) { problems.push(`missing ${a.item} in ${a.room}`); continue; }
     used.add(best);
     const b = o[best];
     // ours stores the footprint center; the kit stores the prototype's placement origin (≤ 1.6 ft apart)
-    if (bd > 1.7) problems.push(`${a.item} moved ${bd.toFixed(2)} ft`);
+    if (bd > 1.7 && !RELOCATED[a.item]) problems.push(`${a.item} moved ${bd.toFixed(2)} ft`);
     if (b.room !== a.room) problems.push(`${a.item}: room ${b.room} vs ${a.room}`);
     if (a.size.some((s: number, i: number) => Math.abs(s - b.size[i]) > 0.15)) problems.push(`${a.item}: size ${b.size} vs ${a.size}`);
     if (Math.abs(((a.rotDeg - b.rotDeg + 540) % 360) - 180) > 1) problems.push(`${a.item}: rotation ${b.rotDeg} vs ${a.rotDeg}`);
