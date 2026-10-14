@@ -1,0 +1,5 @@
+tour: 1056 ft in 6.46 min (fixed 1/30 s step), completed: true
+capsule overlaps with walls/rails/glass: 0 steps
+largest camera move per step: 0.183 ft; largest turn per step: 0.057 rad
+rooms visited: 30/30
+visit order: grounds → entry → foyer → stair1 → kitchen → great → primary → pdeck → primary → closetH → pbath → closetW → pbath → closetH → primary → great → deck → great → dining → wine → dining → powder → dining → great → kitchen → pantry → kitchen → mud → garage → mud → kitchen → stair1 → stair2 → loft → bed4 → bath4 → bed4 → loft → hall2 → office → hall2 → bed2 → bath2 → bed3 → hall2 → stair2 → stair1 → stair0 → game → golf → game → hall0 → bath5 → hall0 → bed5 → hall0 → gym → hall0 → game → terrace → bluff → dock

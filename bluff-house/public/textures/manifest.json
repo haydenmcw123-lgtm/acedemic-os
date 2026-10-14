@@ -1,0 +1,269 @@
+{
+ "format": "uastc+zstd",
+ "sets": {
+  "hickory": {
+   "tileU": 8,
+   "tileV": 8,
+   "w": 1024,
+   "h": 1024
+  },
+  "plaster": {
+   "tileU": 8,
+   "tileV": 8,
+   "w": 512,
+   "h": 512
+  },
+  "ceil": {
+   "tileU": 8,
+   "tileV": 8,
+   "w": 512,
+   "h": 512
+  },
+  "theater": {
+   "tileU": 8,
+   "tileV": 8,
+   "w": 512,
+   "h": 512
+  },
+  "stone": {
+   "tileU": 5,
+   "tileV": 5,
+   "w": 512,
+   "h": 512
+  },
+  "siding": {
+   "tileU": 6,
+   "tileV": 6,
+   "w": 512,
+   "h": 512
+  },
+  "oak": {
+   "tileU": 4,
+   "tileV": 4,
+   "w": 512,
+   "h": 512
+  },
+  "walnut": {
+   "tileU": 4,
+   "tileV": 4,
+   "w": 512,
+   "h": 512
+  },
+  "timber": {
+   "tileU": 7,
+   "tileV": 7,
+   "w": 512,
+   "h": 512
+  },
+  "tile": {
+   "tileU": 8,
+   "tileV": 8,
+   "w": 512,
+   "h": 512
+  },
+  "slate": {
+   "tileU": 6,
+   "tileV": 6,
+   "w": 512,
+   "h": 512
+  },
+  "concrete": {
+   "tileU": 14,
+   "tileV": 14,
+   "w": 512,
+   "h": 512
+  },
+  "rubber": {
+   "tileU": 4,
+   "tileV": 4,
+   "w": 512,
+   "h": 512
+  },
+  "turf": {
+   "tileU": 6,
+   "tileV": 6,
+   "w": 512,
+   "h": 512
+  },
+  "pavers": {
+   "tileU": 12,
+   "tileV": 12,
+   "w": 512,
+   "h": 512
+  },
+  "deck": {
+   "tileU": 8,
+   "tileV": 8,
+   "w": 512,
+   "h": 512
+  },
+  "roof": {
+   "tileU": 8,
+   "tileV": 8,
+   "w": 256,
+   "h": 256
+  },
+  "poolTile": {
+   "tileU": 2,
+   "tileV": 2,
+   "w": 256,
+   "h": 256
+  },
+  "grass": {
+   "tileU": 16,
+   "tileV": 16,
+   "w": 512,
+   "h": 512
+  },
+  "fabric": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  },
+  "boucle": {
+   "tileU": 0.75,
+   "tileV": 0.75,
+   "w": 256,
+   "h": 256
+  },
+  "leather": {
+   "tileU": 1.5,
+   "tileV": 1.5,
+   "w": 256,
+   "h": 256
+  },
+  "quartz": {
+   "tileU": 4,
+   "tileV": 4,
+   "w": 512,
+   "h": 512
+  },
+  "felt": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  },
+  "lightwood": {
+   "tileU": 3,
+   "tileV": 3,
+   "w": 256,
+   "h": 256
+  },
+  "rug0": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 512
+  },
+  "rug1": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 512
+  },
+  "rug2": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 512
+  },
+  "art0": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 384
+  },
+  "art1": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 384
+  },
+  "art2": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 384
+  },
+  "art3": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 384
+  },
+  "screenGame": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 288
+  },
+  "screenGolf": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 512,
+   "h": 420
+  },
+  "leafCard": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  },
+  "canopy": {
+   "tileU": 180,
+   "tileV": 180,
+   "w": 512,
+   "h": 512
+  },
+  "bark": {
+   "tileU": 2,
+   "tileV": 4,
+   "w": 128,
+   "h": 256
+  },
+  "rock": {
+   "tileU": 6,
+   "tileV": 6,
+   "w": 256,
+   "h": 256
+  },
+  "leafOrange": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  },
+  "leafRed": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  },
+  "leafGold": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  },
+  "needles": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  },
+  "treeImpostor": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 128,
+   "h": 256
+  },
+  "waterRipples": {
+   "tileU": 1,
+   "tileV": 1,
+   "w": 256,
+   "h": 256
+  }
+ }
+}

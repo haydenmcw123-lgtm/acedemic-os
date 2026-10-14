@@ -1,0 +1,3 @@
+155 furniture items · 27 doorways · 221 wall pieces · 3 pieces of art
+doorway, wall and art problems: 0
+furniture within 1 ft of the tour path: 0

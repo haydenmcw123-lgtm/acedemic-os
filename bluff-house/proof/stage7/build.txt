@@ -1,0 +1,6 @@
+production build for /acedemic-os/bluff-house-tour/: 147 files, 19.8 MB
+Bluff House · lower 1,852 / main 3,332 / upper 2,040 = 7,224 heated sq ft (+ 1,352 garage)
+Textures: 44 pre-baked KTX2 sets
+Furniture: 155 items from the JSON in 107 merged meshes (180,740 tris; far-away twins 28,992), 131 colliders
+Baked GI: 52 surfaces lightmapped
+First view at 21.76 s
