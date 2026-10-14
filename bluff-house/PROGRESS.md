@@ -1,6 +1,6 @@
 # Bluff House walkthrough: progress
 
-## Status: Stage 6 (Performance + polish) done, waiting for approval
+## Status: Stage 7 (Ship) done: live on GitHub Pages
 
 | Stage | Status |
 |---|---|
@@ -9,8 +9,8 @@
 | 3. Materials + realtime lighting | ✅ approved, proof in `proof/stage3/` |
 | 4. Furniture + exterior | ✅ approved, proof in `proof/stage4/` |
 | 5. Baked GI + reflection probes | ✅ approved, proof in `proof/stage5/` |
-| 6. Performance + polish | ✅ done, proof in `proof/stage6/` |
-| 7. Ship | — |
+| 6. Performance + polish | ✅ approved, proof in `proof/stage6/` |
+| 7. Ship | ✅ done, proof in `proof/stage7/`, live at https://haydenmcw123-lgtm.github.io/acedemic-os/bluff-house-tour/ |
 
 ## Stage 1: what was built
 
@@ -260,6 +260,28 @@
   - 0 Inf/NaN pixels; clipping ≤ 0.48%.
   - Against the Stage 5 baselines: largest difference 0.06 RMSE (loft at noon), so the KTX2 textures, 128 probes and AO change are visually equivalent.
 
+## Stage 7: what was built
+
+- **Production build for any path:** `BASE_PATH` sets where the site is served from; every asset URL in the app is relative to it.
+- **`pnpm deploy:pages`** (`scripts/deploy-pages.ts`):
+  - builds for `/acedemic-os/bluff-house-tour/` with no source maps, and drops the lightmap PNGs (the app loads the KTX2 copies);
+  - commits **only** that folder to `main` and pushes. GitHub Pages republishes in about a minute.
+- **One `README.md`** with run, controls, deploy, test, perf and asset-rebuild steps.
+
+## Stage 7 proof
+
+- `tests/deploy.spec.ts` builds the production site and serves it under the exact GitHub Pages sub-path. It checks:
+  - it boots with **no errors** and no failed requests;
+  - **every request** stays under `/acedemic-os/bluff-house-tour/`;
+  - the 44 KTX2 texture sets and the 52 lightmapped surfaces load.
+  - Screenshot: `proof/stage7/production-build-from-pages-path.png`. Build summary: `proof/stage7/build.txt` (147 files, 19.8 MB).
+- **Deployed:** commit `57b330f` on `main` adds `bluff-house-tour/` and changes nothing else (0 files outside the folder). GitHub's "pages build and deployment" run for it is linked in the final report.
+
+### Stage 7 decisions
+
+42. **A folder on the existing Pages site, not a new site.** This repo's Pages already serves your Academic OS page from the root of `main`. Making the house the whole site would have replaced it, so the walkthrough lives at `/bluff-house-tour/`. It isn't `/bluff-house/`, because that's where the source lands if you merge PR #1.
+43. **Built files are committed to `main`** (19.8 MB per deploy) rather than published by a GitHub Actions workflow. Actions would need Pages switched to "GitHub Actions" in Settings, and then that workflow would have to publish your Academic OS page too. If you deploy often, that switch is the cleaner long-term setup: say so and I'll write the workflow.
+
 ## Walkthrough video (`tests/record.spec.ts`)
 
 - `RECORD=1 pnpm exec playwright test tests/record.spec.ts` renders the guided tour to `video/bluff-house-tour.mp4` (git-ignored):
@@ -368,6 +390,37 @@
     - **The tour skipped stops.** Whenever a step landed within 1/1000 ft short of a stop, the tour walked past without pausing. It missed **stop 41 (the deck's lake view) and stop 99**, and it never held at **Front Entry** at the start. All 33 dwell stops now hold for their full time (new test in `tour.spec.ts`). The tour is 8 s longer, and **it now opens with a 3-second hold on the front entry**, as the data always said.
     - **Shadows could lose their casters.** The sun's shadow map refreshes on the first render after a change, and that was sometimes the lake's mirror pass, which hides furniture (Stage 4) and now the interiors. The mirror pass now leaves the refresh to the main pass (new test in `perf.spec.ts`).
     - A third bug was my own, this stage: the hand-allocated shadow map skipped three.js's shadow-camera refresh, and noon sun leaked through the roof. Caught by comparing the Stage 6 views with Stage 5's before committing, and fixed.
+
+## Handover
+
+**Run it locally:** `pnpm install && pnpm dev` → http://localhost:5173
+
+**Live:** https://haydenmcw123-lgtm.github.io/acedemic-os/bluff-house-tour/
+
+**Exact (computed or checked by tests):**
+- Every room, wall, opening and span comes from `house-data.json` and matches your kit exactly (`data.spec.ts`).
+- Square footage is computed from the data, never typed in: 1,852 / 3,332 / 2,040 = **7,224 heated** (+ 1,352 garage).
+- Stair risers × count equal the floor-to-floor height exactly.
+- Furniture sits at the JSON positions and sizes (each model fitted to its size box; 0 of 155 stretched > 15%).
+- Every doorway keeps a 3-ft clear path; no furniture box hits a wall.
+- The sun's position is the NOAA algorithm for 14 October at Lake Lure. Sunrise, solar noon and sunset are printed at startup.
+- The lightmaps are a physical Cycles bake of the real geometry, with the same sun and sky as the app.
+
+**Approximated:**
+- **Furniture and textures:** parametric stand-ins and procedural PBR materials, not photo-scanned CC0 assets. The asset hosts are blocked here; `pnpm assets` swaps real models in.
+- **Lighting calibration:** a 3.5× lightmap gain and interior exposure 1.6, set by eye like an interior photo. AO is screen-space (N8AO).
+- **Reflections:** six room probes; other rooms reflect a generic stand-in. Glass reflects but doesn't refract.
+- **Landscape:** trees are stylized leaf cards; the hills, far shore and ridgelines are procedural, not Lake Lure's real topography. The lake is a planar mirror with ripples.
+- **Sky:** three.js's Preetham model, not a measured sky.
+
+**The 3 changes that would add the most realism next:**
+1. **Real CC0 furniture and photo-scanned materials** (Poly Haven, ambientCG). This is the biggest visible jump, since stand-in furniture is what reads as "CG" first. About **2 days**: fetch and compress, fit to the JSON boxes, re-check clearances, then re-bake. It needs those hosts allowed in this environment, or you downloading the files (the list is in `assets/MANUAL-DOWNLOADS.md`).
+2. **A higher-quality bake:**
+   - 4096² or one atlas per floor;
+   - built-ins and big furniture baked in, so they get contact shadows and soft bounce;
+   - a real denoiser (OpenImageDenoise is in Mac Blender).
+   - It fixes the dark door jambs and the slightly flat furniture. About **1 day** of work plus ~3–4 hours of baking on your Mac.
+3. **The real site:** USGS elevation data for Lake Lure's hills and shoreline, and photogrammetry trees or proper tree impostors. The exterior views from the water and the decks would read as the actual place. About **2–3 days**.
 
 ## Known issues (to fix in later stages)
 
