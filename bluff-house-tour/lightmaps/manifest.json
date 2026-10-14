@@ -1,0 +1,289 @@
+{
+ "res": 2048,
+ "samples": 128,
+ "maxValue": 0.30604867439171973,
+ "skyFactor": 0.05567323326174232,
+ "times": [
+  {
+   "name": "morning",
+   "hour": 8,
+   "file": "morning.png"
+  },
+  {
+   "name": "noon",
+   "hour": 12.5,
+   "file": "noon.png"
+  },
+  {
+   "name": "golden",
+   "hour": 17.75,
+   "file": "golden.png"
+  }
+ ],
+ "ao": "ao.png",
+ "uv2": "uv2.bin",
+ "objects": [
+  {
+   "name": "L0i:hickory",
+   "tris": 8,
+   "offset": 0
+  },
+  {
+   "name": "L0i:ceil",
+   "tris": 14,
+   "offset": 48
+  },
+  {
+   "name": "L0i:tile",
+   "tris": 2,
+   "offset": 132
+  },
+  {
+   "name": "L0i:rubber",
+   "tris": 2,
+   "offset": 144
+  },
+  {
+   "name": "L0i:turf",
+   "tris": 2,
+   "offset": 156
+  },
+  {
+   "name": "L0i:plaster",
+   "tris": 128,
+   "offset": 168
+  },
+  {
+   "name": "L0i:sill",
+   "tris": 6,
+   "offset": 936
+  },
+  {
+   "name": "L0i:trim",
+   "tris": 276,
+   "offset": 972
+  },
+  {
+   "name": "L0i:tilewall",
+   "tris": 12,
+   "offset": 2628
+  },
+  {
+   "name": "L0i:slot:noshadow",
+   "tris": 24,
+   "offset": 2700
+  },
+  {
+   "name": "L0i:leaf",
+   "tris": 24,
+   "offset": 2844
+  },
+  {
+   "name": "L0i:theater",
+   "tris": 4,
+   "offset": 2988
+  },
+  {
+   "name": "L1i:hickory",
+   "tris": 16,
+   "offset": 3012
+  },
+  {
+   "name": "L1i:ceil",
+   "tris": 26,
+   "offset": 3108
+  },
+  {
+   "name": "L1i:tile",
+   "tris": 4,
+   "offset": 3264
+  },
+  {
+   "name": "L1i:slate",
+   "tris": 6,
+   "offset": 3288
+  },
+  {
+   "name": "L1i:concrete",
+   "tris": 2,
+   "offset": 3324
+  },
+  {
+   "name": "L1i:plaster",
+   "tris": 294,
+   "offset": 3336
+  },
+  {
+   "name": "L1i:stone",
+   "tris": 32,
+   "offset": 5100
+  },
+  {
+   "name": "L1i:steel",
+   "tris": 204,
+   "offset": 5292
+  },
+  {
+   "name": "L1i:brass",
+   "tris": 12,
+   "offset": 6516
+  },
+  {
+   "name": "L1i:paneling",
+   "tris": 20,
+   "offset": 6588
+  },
+  {
+   "name": "L1i:trim",
+   "tris": 792,
+   "offset": 6708
+  },
+  {
+   "name": "L1i:slot:noshadow",
+   "tris": 84,
+   "offset": 11460
+  },
+  {
+   "name": "L1i:leaf",
+   "tris": 84,
+   "offset": 11964
+  },
+  {
+   "name": "L1i:tilewall",
+   "tris": 30,
+   "offset": 12468
+  },
+  {
+   "name": "L1i:sill",
+   "tris": 20,
+   "offset": 12648
+  },
+  {
+   "name": "L1i:drywall",
+   "tris": 94,
+   "offset": 12768
+  },
+  {
+   "name": "L1i:walnut",
+   "tris": 12,
+   "offset": 13332
+  },
+  {
+   "name": "L1i:soot",
+   "tris": 2,
+   "offset": 13404
+  },
+  {
+   "name": "L1i:timber",
+   "tris": 12,
+   "offset": 13416
+  },
+  {
+   "name": "L2i:hickory",
+   "tris": 12,
+   "offset": 13488
+  },
+  {
+   "name": "L2i:ceil",
+   "tris": 16,
+   "offset": 13560
+  },
+  {
+   "name": "L2i:tile",
+   "tris": 4,
+   "offset": 13656
+  },
+  {
+   "name": "L2i:paneling",
+   "tris": 36,
+   "offset": 13680
+  },
+  {
+   "name": "L2i:sill",
+   "tris": 20,
+   "offset": 13896
+  },
+  {
+   "name": "L2i:trim",
+   "tris": 708,
+   "offset": 14016
+  },
+  {
+   "name": "L2i:plaster",
+   "tris": 184,
+   "offset": 18264
+  },
+  {
+   "name": "L2i:steel",
+   "tris": 12,
+   "offset": 19368
+  },
+  {
+   "name": "L2i:walnut",
+   "tris": 12,
+   "offset": 19440
+  },
+  {
+   "name": "L2i:tilewall",
+   "tris": 64,
+   "offset": 19512
+  },
+  {
+   "name": "L2i:slot:noshadow",
+   "tris": 72,
+   "offset": 19896
+  },
+  {
+   "name": "L2i:leaf",
+   "tris": 72,
+   "offset": 20328
+  },
+  {
+   "name": "stair:hickory",
+   "tris": 14,
+   "offset": 20760
+  },
+  {
+   "name": "stair:slabEdge",
+   "tris": 48,
+   "offset": 20844
+  },
+  {
+   "name": "stair:ceil",
+   "tris": 18,
+   "offset": 21132
+  },
+  {
+   "name": "stair:plaster",
+   "tris": 34,
+   "offset": 21240
+  },
+  {
+   "name": "stair:sill",
+   "tris": 2,
+   "offset": 21444
+  },
+  {
+   "name": "stair:trim",
+   "tris": 12,
+   "offset": 21456
+  },
+  {
+   "name": "stair:oak",
+   "tris": 404,
+   "offset": 21528
+  },
+  {
+   "name": "stair:steel",
+   "tris": 48,
+   "offset": 23952
+  },
+  {
+   "name": "stair:walnut",
+   "tris": 84,
+   "offset": 24240
+  }
+ ],
+ "note": "lighting = irradiance/\u03c0, stored as sRGB PNG scaled by 1/maxValue",
+ "ktx2": true
+}
