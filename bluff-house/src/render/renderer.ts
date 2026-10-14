@@ -11,6 +11,28 @@ export interface RenderRig {
   onResize: ((w: number, h: number) => void)[];
 }
 
+/**
+ * The sun's shadow map, allocated here rather than by three: three's default render target carries
+ * an RGBA8 color buffer that the depth-only shadow pass never reads (64 MB at 4096²). This one has a
+ * 1-byte color buffer and a 16-bit depth texture for PCF (hardware comparison).
+ */
+export function allocShadowMap(sun: THREE.DirectionalLight, size: number, depthType: THREE.TextureDataType = THREE.UnsignedShortType) {
+  sun.shadow.mapSize.set(size, size);
+  if (sun.shadow.map) { sun.shadow.map.depthTexture?.dispose(); sun.shadow.map.dispose(); }
+  const rt = new THREE.WebGLRenderTarget(size, size, { format: THREE.RedFormat, type: THREE.UnsignedByteType, generateMipmaps: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  // 16-bit depth: the sun's camera is orthographic (depth is linear), so 550 ft of range still
+  // resolves 0.1 in — half the memory of three's 32-bit default
+  const d = new THREE.DepthTexture(size, size, depthType);
+  d.format = THREE.DepthFormat;
+  d.compareFunction = THREE.LessEqualCompare;
+  d.minFilter = d.magFilter = THREE.LinearFilter;
+  d.name = 'sun.shadowMap';
+  rt.depthTexture = d;
+  sun.shadow.map = rt;
+  // three refreshes the shadow camera's projection only when it creates the map itself
+  sun.shadow.camera.updateProjectionMatrix();
+}
+
 /** House center the sun's shadow camera is fitted around (ft). */
 export const SHADOW_TARGET = new THREE.Vector3(33, 10, 46);
 
@@ -42,9 +64,9 @@ export function createRenderer(container: HTMLElement, test: boolean): RenderRig
   sun.position.copy(SHADOW_TARGET).add(new THREE.Vector3(-150, 200, 150));
   sun.target.position.copy(SHADOW_TARGET);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
   // tight ortho box around the house (±70 ft): ~2 px per inch of shadow resolution
   Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 100, far: 650 });
+  allocShadowMap(sun, 4096); // after the camera box: it refreshes the shadow projection
   sun.shadow.bias = -0.00025;
   sun.shadow.normalBias = 0.045;
   sun.shadow.radius = 2.5;

@@ -44,3 +44,6 @@ export function fbm2(x: number, y: number, oct = 4, s = 0) {
 export const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 export const sstep = (a: number, b: number, v: number) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** √(x² + y²) without Math.hypot, which V8 implements by allocating an array for its arguments. */
+export const len2 = (x: number, y: number) => Math.sqrt(x * x + y * y);

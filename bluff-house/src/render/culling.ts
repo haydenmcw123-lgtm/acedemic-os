@@ -11,18 +11,18 @@ import { levelOfFeet } from '../data/house';
 export class LevelCuller {
   level = 1;
   inside = false;
-  constructor(private groups: Map<GroupKey, THREE.Group>, private plan: Plan) {}
+  private levels: THREE.Group[];
+  constructor(groups: Map<GroupKey, THREE.Group>, private plan: Plan) {
+    this.levels = ([0, 1, 2] as const).map((l) => groups.get(`L${l}i` as GroupKey)!);
+  }
 
   update(x: number, z: number, feet: number) {
     const L = levelOfFeet(feet);
     const room = this.plan.roomAt(L, x, z);
     this.level = L;
     this.inside = !!room;
-    for (const l of [0, 1, 2]) {
-      const g = this.groups.get(`L${l}i` as GroupKey)!;
-      g.visible = !this.inside || Math.abs(l - L) <= 1;
-    }
+    for (let l = 0; l < 3; l++) this.levels[l].visible = !this.inside || Math.abs(l - L) <= 1;
   }
 
-  showAll() { for (const l of [0, 1, 2]) this.groups.get(`L${l}i` as GroupKey)!.visible = true; }
+  showAll() { for (let l = 0; l < 3; l++) this.levels[l].visible = true; }
 }

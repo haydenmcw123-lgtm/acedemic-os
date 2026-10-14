@@ -17,7 +17,11 @@ import type { LevelCuller } from './render/culling';
 import type { Post, ToneMap } from './render/post';
 import type { InteriorLights } from './lighting/interior';
 import { renderLevelAerial, renderPlan, windowFromViewBox } from './render/planview';
-import type { RenderRig } from './render/renderer';
+import { allocShadowMap, type RenderRig } from './render/renderer';
+import type { AdaptiveQuality } from './render/adaptive';
+import type { Quality } from './ui/dock';
+import { gpuMemory } from './perf/gpumem';
+import type { TreeLods } from './build/trees';
 
 interface Deps {
   rig: RenderRig;
@@ -27,6 +31,9 @@ interface Deps {
   lightmaps: Lightmaps;
   probes: Probes;
   setBaked: (on: boolean) => void;
+  adaptive: AdaptiveQuality;
+  trees: { lod: TreeLods };
+  setQuality: (q: Quality) => void;
   player: PlayerController;
   culler: LevelCuller;
   director: Director;
@@ -52,6 +59,26 @@ export function installTestApi(d: Deps) {
     rig.renderer.setPixelRatio(1);
     rig.renderer.setSize(w, h, false); rig.camera.aspect = w / h; rig.camera.updateProjectionMatrix();
     d.post.setSize(w, h); d.lake.setSize(w, h);
+  };
+  let tallyRT: THREE.WebGLRenderTarget | null = null;
+  /** One full post-processed frame, counted: draw calls and triangles of everything it rendered. */
+  const tally = () => {
+    const info = rig.renderer.info;
+    info.autoReset = false; info.reset();
+    const passes = d.lake.passes, t0 = performance.now();
+    d.post.render(1 / 30);
+    rig.renderer.getContext().finish();
+    const mirror = d.lake.passes > passes;
+    const r = { calls: info.render.calls, tris: info.render.triangles, mirror, mirrorCalls: mirror ? d.lake.lastCalls : 0, sceneCalls: 0, inside: d.culler.inside, ms: performance.now() - t0 };
+    // the main scene pass alone (what the budget counts; the mirror and the post passes come on top)
+    // (into a small linear target like the composer's, so no sRGB-output shader variants get compiled)
+    tallyRT ??= new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType });
+    rig.renderer.setRenderTarget(tallyRT);
+    info.reset(); rig.renderer.render(rig.scene, rig.camera);
+    rig.renderer.setRenderTarget(null);
+    r.sceneCalls = info.render.calls;
+    info.autoReset = true;
+    return r;
   };
   const state = () => {
     const L = levelOfFeet(player.feet);
@@ -423,7 +450,144 @@ export function installTestApi(d: Deps) {
     },
     /** Cycles an item's finish (staging) and returns the new label. */
     cycleItem(id: number) { return d.furniture.cycle(d.furniture.items[id]); },
+    /**
+     * What the last frame drew, grouped by where it comes from (approximates the renderer: visible,
+     * in the frustum, one call per material group). Used to find draw-call savings.
+     */
+    drawBreakdown() {
+      const cam = rig.camera, fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+      const by: Record<string, number> = {};
+      const visit = (o: THREE.Object3D, top: string) => {
+        if (!o.visible) return;
+        const m = o as THREE.Mesh;
+        if (m.isMesh || (o as THREE.Points).isPoints) {
+          let inView = true;
+          if (o.frustumCulled) {
+            const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+            const sph = (m as unknown as THREE.InstancedMesh).isInstancedMesh ? ((m as unknown as THREE.InstancedMesh).boundingSphere ?? g.boundingSphere!) : g.boundingSphere!;
+            inView = fr.intersectsSphere(sph.clone().applyMatrix4(o.matrixWorld));
+          }
+          if (inView) { const n = Array.isArray(m.material) ? m.material.length : 1; const k = top + (o.name.startsWith('furniture:') ? ':furniture' : ''); by[k] = (by[k] ?? 0) + n; }
+        }
+        for (const c of o.children) visit(c, top);
+      };
+      for (const c of rig.scene.children) visit(c, c.name || c.type);
+      return Object.entries(by).sort((a, b) => b[1] - a[1]);
+    },
     info() { return { calls: rig.renderer.info.render.calls, tris: rig.renderer.info.render.triangles }; },
+    /**
+     * Adaptive quality: feeds a frame-time series (ms) to the controller, as if those frames had been
+     * rendered, and reports the tier after every frame plus what each change applied.
+     */
+    adaptiveRun(series: number[], reset = true) {
+      const a = d.adaptive;
+      if (reset) d.setQuality('auto');
+      const tiers = new Int8Array(series.length);
+      for (let i = 0; i < series.length; i++) { a.sample(series[i]); tiers[i] = a.tier; }
+      const s = rig.sun.shadow.mapSize.x;
+      return {
+        tiers: Array.from(tiers), log: a.log.slice(), tier: a.tier, ceiling: a.ceiling, label: a.label,
+        applied: { pixelRatio: rig.renderer.getPixelRatio(), ao: d.post.ao.enabled as boolean, aoSamples: d.post.ao.configuration.aoSamples as number, lake: d.lake.enabled, shadow: s },
+      };
+    },
+    /** Whole-frame tallies for one full post-processed render from a pose (perf.spec). */
+    frameTally(x: number, z: number, feet: number, yaw: number, pitch: number, w = 1280, h = 720) {
+      d.director.pause();
+      player.teleport(x, z, feet); player.yaw = yaw; player.pitch = pitch;
+      d.culler.update(player.x, player.z, player.feet);
+      setSize(w, h);
+      player.applyCamera(rig.camera);
+      d.renderSettled();
+      return tally();
+    },
+    /**
+     * The guided tour at a fixed step, rendering the full frame (mirror + scene + AO + post) at every
+     * stop (1 s into its dwell) and every `travelEvery` seconds between stops. Draw calls and
+     * triangles do not depend on the GPU, so these numbers hold on any machine; the frame times here
+     * are software rendering (SwiftShader) and only the laptop run (pnpm perf) gives real ones.
+     */
+    tourTally(w = 1280, h = 720, travelEvery = 4, dt = 1 / 30) {
+      setSize(w, h);
+      d.director.restart();
+      type F = { inside: boolean; calls: number; sceneCalls: number; mirrorCalls: number; tris: number; ms: number };
+      const stops: (F & { stop: number; label: string })[] = [];
+      const travel: (F & { t: number })[] = [];
+      const pick = (r: ReturnType<typeof tally>): F => ({ inside: r.inside, calls: r.calls, sceneCalls: r.sceneCalls, mirrorCalls: r.mirrorCalls, tris: r.tris, ms: Math.round(r.ms) });
+      let t = 0, nextTravel = travelEvery, cur = -1, dwellT = 0;
+      const measured = new Set<number>();
+      d.renderSettled();
+      while (d.director.mode === 'tour' && t < 1200) {
+        d.step(dt); t += dt;
+        const ds = d.tour.dwellStop;
+        if (ds >= 0) {
+          // every stop once, half a second into its dwell (the camera has settled on the view)
+          if (ds !== cur) { cur = ds; dwellT = 0; }
+          dwellT += dt;
+          if (dwellT >= 0.5 && !measured.has(ds)) { measured.add(ds); stops.push({ stop: ds + 1, label: d.tour.stops[ds].label ?? whereAt(built.plan, player.x, player.z, player.feet).name, ...pick(tally()) }); }
+        } else {
+          cur = -1;
+          if (t >= nextTravel) { nextTravel = t + travelEvery; travel.push({ t: Math.round(t), ...pick(tally()) }); }
+        }
+      }
+      return { seconds: t, stops, travel };
+    },
+    /** n frames of the running tour, each a fixed step plus the full post-processed render. */
+    runFrames(n: number, w: number, h: number, restart: boolean, dt = 1 / 30, render = true) {
+      if (restart) { setSize(w, h); d.director.restart(); d.renderSettled(); }
+      for (let i = 0; i < n; i++) { d.step(dt); if (render) d.post.render(dt); }
+    },
+    /** Debug: how many shader-program re-checks (getProgram) n frames cause, under a few variants. */
+    programChecks(n = 6) {
+      let count = 0;
+      const mats = new Set<THREE.Material>();
+      rig.scene.traverse((o) => { const m = (o as THREE.Mesh).material; if (m) for (const x of Array.isArray(m) ? m : [m]) mats.add(x); });
+      const saved = new Map<THREE.Material, () => string>();
+      for (const m of mats) { const f = m.customProgramCacheKey; saved.set(m, f); m.customProgramCacheKey = function (this: THREE.Material) { count++; return f.call(this); }; }
+      const out: Record<string, number> = {};
+      const run = (k: string) => { for (let i = 0; i < 2; i++) { d.step(1 / 30); d.post.render(1 / 30); } count = 0; for (let i = 0; i < n; i++) { d.step(1 / 30); d.post.render(1 / 30); } out[k] = count / n; };
+      run('all');
+      d.lake.enabled = false; run('noLake'); d.lake.enabled = true;
+      const ao = d.post.ao.enabled; d.post.ao.enabled = false; run('noAO'); d.post.ao.enabled = ao;
+      count = 0; for (let i = 0; i < n; i++) { d.step(1 / 30); rig.renderer.render(rig.scene, rig.camera); } out.plainRender = count / n;
+      const ver = new Map([...mats].map((m) => [m, m.version]));
+      const names: Record<string, number> = {};
+      for (const m of mats) { const f = saved.get(m)!; m.customProgramCacheKey = function (this: THREE.Material) { names[`${m.type}:${m.name}`] = (names[`${m.type}:${m.name}`] ?? 0) + 1; return f.call(this); }; }
+      rig.renderer.render(rig.scene, rig.camera);
+      (out as Record<string, unknown>).who = Object.entries(names).slice(0, 30);
+      (out as Record<string, unknown>).versionBumped = [...mats].filter((m) => m.version !== ver.get(m)).map((m) => m.name).slice(0, 20);
+      for (const [m, f] of saved) m.customProgramCacheKey = f;
+      return out;
+    },
+    /** LOD state after a step from a pose: furniture floors showing their far twins, full / lite tree crowns. */
+    lodAt(x: number, z: number, feet: number) {
+      d.director.pause();
+      player.teleport(x, z, feet);
+      d.step(1 / 30);
+      d.trees.lod.update(rig.camera.position.x, rig.camera.position.z, true);
+      const st = d.furniture.stats();
+      return { furnitureFar: st.far, furnitureTris: st.tris, furnitureLoTris: st.loTris, treesFull: d.trees.lod.full, treesLite: d.trees.lod.lite };
+    },
+    setQuality(q: Quality) { d.setQuality(q); },
+    /** Debug: re-allocate the sun's shadow map ('ours16', 'ours32' or 'three' = three's own default). */
+    shadowMode(mode: string) {
+      const sun = rig.sun;
+      if (mode === 'three') { sun.shadow.map?.depthTexture?.dispose(); sun.shadow.map?.dispose(); sun.shadow.map = null; }
+      else allocShadowMap(sun, sun.shadow.mapSize.x, mode === 'ours32' ? THREE.UnsignedIntType : THREE.UnsignedShortType);
+      rig.renderer.shadowMap.needsUpdate = true;
+    },
+    lakeEnabled(on: boolean) { d.lake.enabled = on; },
+    /** Debug: the dwells the tour actually makes at a fixed step: [stop number, seconds held]. */
+    dwellSequence(dt = 1 / 30) {
+      d.director.restart();
+      const out: [number, number][] = [];
+      for (let t = 0; d.director.mode === 'tour' && t < 1200; t += dt) {
+        d.step(dt);
+        const ds = d.tour.dwellStop;
+        if (ds >= 0) { const last = out[out.length - 1]; if (last && last[0] === ds + 1) last[1] += dt; else out.push([ds + 1, dt]); }
+      }
+      return out.map(([a, b]) => [a, +b.toFixed(2)]);
+    },
+    gpuMemory() { return { shapes: [...gpuMemory.shapes].sort((a, b) => b[1].bytes - a[1].bytes).slice(0, 25).map(([k, v]) => `${k}: ${v.count}× = ${(v.bytes / 1048576).toFixed(1)} MB`), textures: gpuMemory.textures / 1048576, buffers: gpuMemory.buffers / 1048576, renderbuffers: gpuMemory.renderbuffers / 1048576, total: gpuMemory.total / 1048576 }; },
     /** Runs level culling for the current position and reports which interior groups are drawn. */
     culling() {
       d.culler.update(player.x, player.z, player.feet);

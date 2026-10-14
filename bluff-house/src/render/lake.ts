@@ -95,6 +95,10 @@ export class Lake {
   private _p = new THREE.Vector3(); private _n = new THREE.Vector3(0, 1, 0); private _cam = new THREE.Vector3();
   private _rot = new THREE.Matrix4(); private _look = new THREE.Vector3(); private _target = new THREE.Vector3();
   private _plane = new THREE.Plane(); private _clip = new THREE.Vector4(); private _q = new THREE.Vector4();
+  private _view = new THREE.Vector3(); private _vis: boolean[] = [];
+  private _frustum = new THREE.Frustum(); private _pv = new THREE.Matrix4(); private _box = new THREE.Box3();
+  /** Mirror passes rendered / skipped because no water was in view (perf report). */
+  passes = 0; skipped = 0; lastCalls = 0;
 
   /** Advances the ripples and renders the mirror image for this frame (call before the post chain). */
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, dt: number) {
@@ -106,8 +110,13 @@ export class Lake {
     camera.updateMatrixWorld();
     const p = this._p.set(0, this.y, 0), n = this._n, cam = this._cam.setFromMatrixPosition(camera.matrixWorld);
     if (cam.y < this.y + 0.05) return;
+    // no water in the view frustum (facing away from the lake, looking at a floor): skip the pass
+    this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    if (!this.mesh.geometry.boundingBox) this.mesh.geometry.computeBoundingBox();
+    if (!this._frustum.setFromProjectionMatrix(this._pv).intersectsBox(this._box.copy(this.mesh.geometry.boundingBox!))) { this.skipped++; return; }
+    this.passes++;
     // mirror the camera across the water plane (three's Reflector math)
-    const view = cam.clone().sub(p).reflect(n).add(p); // the camera mirrored below the water
+    const view = this._view.copy(cam).sub(p).reflect(n).add(p); // the camera mirrored below the water
     this._rot.extractRotation(camera.matrixWorld);
     this._look.set(0, 0, -1).applyMatrix4(this._rot).add(cam);
     this._target.subVectors(p, this._look).reflect(n).negate().add(p);
@@ -130,16 +139,20 @@ export class Lake {
     e[2] = c.x; e[6] = c.y; e[10] = c.z + 1; e[14] = c.w;
 
     this.mesh.visible = false;
-    const vis = this.hideInReflection.map((o) => o.visible);
-    for (const o of this.hideInReflection) o.visible = false;
-    const prevTarget = renderer.getRenderTarget(), prevShadow = renderer.shadowMap.autoUpdate;
-    renderer.shadowMap.autoUpdate = false;
+    const hide = this.hideInReflection, vis = this._vis;
+    for (let i = 0; i < hide.length; i++) { vis[i] = hide[i].visible; hide[i].visible = false; }
+    // the shadow map must not be refreshed here: with the interiors and furniture hidden it would lose
+    // their shadows (sun through walls). A pending update waits for the main pass.
+    const prevTarget = renderer.getRenderTarget(), prevShadow = renderer.shadowMap.autoUpdate, pending = renderer.shadowMap.needsUpdate;
+    renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = false;
     renderer.setRenderTarget(this.rt);
     renderer.clear();
+    const c0 = renderer.info.render.calls;
     renderer.render(scene, vc);
+    this.lastCalls = renderer.info.render.calls - c0; // meaningful when info.autoReset is off (perf counting)
     renderer.setRenderTarget(prevTarget);
-    renderer.shadowMap.autoUpdate = prevShadow;
-    this.hideInReflection.forEach((o, i) => (o.visible = vis[i]));
+    renderer.shadowMap.autoUpdate = prevShadow; renderer.shadowMap.needsUpdate = pending;
+    for (let i = 0; i < hide.length; i++) hide[i].visible = vis[i];
     this.mesh.visible = true;
   }
 }

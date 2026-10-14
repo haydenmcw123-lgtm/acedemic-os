@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { material } from '../materials/library';
 import { textureSet } from '../materials/procedural';
-import { clamp, fbm2, rng } from '../util/noise';
+import { clamp, fbm2, rng, len2 } from '../util/noise';
 import { LAKE_Y } from './world';
 
 /**
@@ -10,6 +10,8 @@ import { LAKE_Y } from './world';
  *  - Near (≤ 300 ft): instanced trees per species — red maple, orange oak, gold hickory and white
  *    pine — each a tapered trunk plus a crown of alpha-tested leaf cards that sway in the wind (vertex
  *    shader) and cast leaf-shaped shadows (a depth material with the same alpha test).
+ *    LOD: past 140 ft a tree swaps to a lite crown (30% of the cards, each bigger, same silhouette),
+ *    except near the house where the sun's shadow map covers it (a swap there would re-render shadows).
  *  - Mid (300–1,000 ft): camera-facing impostor billboards, tinted per instance.
  *  - Boulders on the bluff.
  * Placement keeps the house, decks, pool, drive, bluff stairs and dock clear, and keeps the view
@@ -28,7 +30,7 @@ const SPECIES: Species[] = [
 ];
 
 /** A unit tree (height 1, base at the origin): trunk geometry and crown-card geometry. */
-function unitTree(sp: Species, seed: number) {
+function unitTree(sp: Species, seed: number, lite = 1) {
   const r = rng(seed);
   const trunk = new THREE.CylinderGeometry(0.008, 0.022, 1, 7, 1, true).translate(0, 0.5, 0);
   // a couple of main limbs into the crown
@@ -41,7 +43,8 @@ function unitTree(sp: Species, seed: number) {
   }
   const cards: THREE.BufferGeometry[] = [];
   const [cy, rad] = sp.crown;
-  for (let i = 0; i < sp.cards; i++) {
+  const n = Math.round(sp.cards * lite), grow = Math.sqrt(1 / lite); // same leaf area with fewer cards
+  for (let i = 0; i < n; i++) {
     let x: number, y: number, z: number, s: number;
     if (sp.pine) {
       // a narrow cone of needle tufts, denser and wider toward the bottom
@@ -52,7 +55,7 @@ function unitTree(sp: Species, seed: number) {
       const u = r() * 2 - 1, a = r() * Math.PI * 2, rr = 0.55 + Math.cbrt(r()) * 0.45, q = Math.sqrt(1 - u * u);
       x = q * Math.cos(a) * rad * rr; z = q * Math.sin(a) * rad * rr; y = cy + u * (1 - cy) * 0.82 * rr; s = 0.08 + r() * 0.06;
     }
-    const g = new THREE.PlaneGeometry(s, s);
+    const g = new THREE.PlaneGeometry(s * grow, s * grow);
     g.rotateX(-Math.PI / 2 + (r() - 0.5) * 1.6); g.rotateY(r() * Math.PI * 2);
     g.translate(x, y, z);
     cards.push(g);
@@ -88,6 +91,52 @@ export interface TreeSite {
   blocked: (x: number, z: number) => boolean;
 }
 
+/** Lite crowns past this distance (ft); a little hysteresis keeps a tree from flickering between them. */
+export const TREE_LOD = { far: 140, band: 8, every: 0.5 };
+const LITE = 0.3;
+
+interface TreeLod { full: THREE.InstancedMesh; lite: THREE.InstancedMesh; mats: Float32Array; cols: Float32Array; pos: Float32Array; n: number; shadowed: Uint8Array }
+
+/**
+ * Tree crown LOD: twice a second, every tree is written into either the full or the lite crown
+ * instances by its distance from the camera (allocation-free: straight copies between typed arrays).
+ */
+export class TreeLods {
+  private timer = 0;
+  private far: Uint8Array[];
+  /** Trees currently drawn with full / lite crowns. */
+  full = 0; lite = 0;
+  constructor(private species: TreeLod[]) { this.far = species.map((s) => new Uint8Array(s.n).fill(2)); }
+
+  update(camX: number, camZ: number, force = false, dt = 0) {
+    this.timer -= dt;
+    if (this.timer > 0 && !force) return;
+    this.timer = TREE_LOD.every;
+    this.full = 0; this.lite = 0;
+    for (let k = 0; k < this.species.length; k++) {
+      const s = this.species[k], far = this.far[k];
+      const fm = s.full.instanceMatrix.array as Float32Array, lm = s.lite.instanceMatrix.array as Float32Array;
+      const fc = s.full.instanceColor!.array as Float32Array, lc = s.lite.instanceColor!.array as Float32Array;
+      let nf = 0, nl = 0, changed = false;
+      for (let i = 0; i < s.n; i++) {
+        const x = s.pos[i * 2], z = s.pos[i * 2 + 1];
+        const d = len2(x - camX, z - camZ);
+        const was = far[i];
+        // trees the sun's shadow map covers keep their full crown: a crown swap there would force a
+        // re-render of the 4096² shadow map every time the camera crossed a tree's LOD distance
+        const isFar = !s.shadowed[i] && (was === 1 ? d > TREE_LOD.far - TREE_LOD.band : d > TREE_LOD.far + TREE_LOD.band);
+        if ((isFar ? 1 : 0) !== was) { far[i] = isFar ? 1 : 0; changed = true; }
+        const dm = isFar ? lm : fm, dc = isFar ? lc : fc, j = isFar ? nl++ : nf++;
+        for (let e = 0; e < 16; e++) dm[j * 16 + e] = s.mats[i * 16 + e];
+        dc[j * 3] = s.cols[i * 3]; dc[j * 3 + 1] = s.cols[i * 3 + 1]; dc[j * 3 + 2] = s.cols[i * 3 + 2];
+      }
+      s.full.count = nf; s.lite.count = nl;
+      if (changed) { s.full.instanceMatrix.needsUpdate = s.lite.instanceMatrix.needsUpdate = true; s.full.instanceColor!.needsUpdate = s.lite.instanceColor!.needsUpdate = true; }
+      this.full += nf; this.lite += nl;
+    }
+  }
+}
+
 export function buildTrees(site: TreeSite, seed = 7) {
   const group = new THREE.Group(); group.name = 'trees';
   const r = rng(seed);
@@ -113,10 +162,11 @@ export function buildTrees(site: TreeSite, seed = 7) {
     near[sp].push({ x, z, y: y - 0.5, h, s: 0.8 + r() * 0.4, rot: r() * Math.PI * 2 });
   }
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3(), p = new THREE.Vector3();
+  const lods: TreeLod[] = [];
   SPECIES.forEach((sp, k) => {
     const list = near[k];
     if (!list.length) return;
-    const geo = unitTree(sp, 400 + k);
+    const geo = unitTree(sp, 400 + k), lite = unitTree(sp, 400 + k, LITE).crown;
     const bark = material('bark', 'ext').clone();
     addWind(bark, 0.006);
     const leaf = material(sp.leaf, 'ext').clone();
@@ -124,23 +174,34 @@ export function buildTrees(site: TreeSite, seed = 7) {
     addWind(leaf, 0.012);
     const trunks = new THREE.InstancedMesh(geo.trunk, bark, list.length);
     const crowns = new THREE.InstancedMesh(geo.crown, leaf, list.length);
+    const lites = new THREE.InstancedMesh(lite, leaf, list.length);
     const col = new THREE.Color();
+    const mats = new Float32Array(list.length * 16), cols = new Float32Array(list.length * 3), pos = new Float32Array(list.length * 2);
     list.forEach((t, i) => {
       m4.compose(p.set(t.x, t.y, t.z), q.setFromAxisAngle(up, t.rot), sc.set(t.h * t.s * 0.9, t.h, t.h * t.s * 0.9));
-      trunks.setMatrixAt(i, m4); crowns.setMatrixAt(i, m4);
+      trunks.setMatrixAt(i, m4); m4.toArray(mats, i * 16);
       // a little per-tree variation in leaf color (some trees further along than others)
-      crowns.setColorAt(i, col.setRGB(1, 0.9 + clamp(fbm2(t.x / 40, t.z / 40, 2, 93), 0, 1) * 0.2, 0.85 + r() * 0.2));
+      col.setRGB(1, 0.9 + clamp(fbm2(t.x / 40, t.z / 40, 2, 93), 0, 1) * 0.2, 0.85 + r() * 0.2).toArray(cols, i * 3);
+      pos[i * 2] = t.x; pos[i * 2 + 1] = t.z;
     });
-    for (const im of [trunks, crowns]) { im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); im.name = `trees:${sp.key}`; }
-    crowns.customDepthMaterial = leaf.userData.depthMat;
-    group.add(trunks, crowns);
+    for (const im of [crowns, lites]) { im.setColorAt(0, col); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
+    for (const im of [trunks, crowns, lites]) { im.castShadow = true; im.receiveShadow = true; im.name = `trees:${sp.key}`; }
+    crowns.customDepthMaterial = lites.customDepthMaterial = leaf.userData.depthMat;
+    // bounds of the whole stand, so frustum culling never drops a partition that is in view
+    trunks.computeBoundingSphere();
+    crowns.boundingSphere = trunks.boundingSphere!.clone(); lites.boundingSphere = trunks.boundingSphere!.clone();
+    group.add(trunks, crowns, lites);
+    // inside the sun's shadow box (SHADOW_TARGET ± 70 ft, plus a crown's reach): always full detail
+    const shadowed = Uint8Array.from(list, (t) => (Math.abs(t.x - 33) < 90 && Math.abs(t.z - 46) < 90 ? 1 : 0));
+    lods.push({ full: crowns, lite: lites, mats, cols, pos, n: list.length, shadowed });
   });
-
+  const lod = new TreeLods(lods);
+  lod.update(0, 0, true);
   // ---- mid-distance impostors ----
   group.add(impostors(site, r));
   // ---- boulders on the bluff ----
   group.add(boulders(site, r));
-  return { group, count: near.reduce((a, l) => a + l.length, 0) };
+  return { group, count: near.reduce((a, l) => a + l.length, 0), lod };
 }
 
 /** Camera-facing tree billboards between ~300 and 1,000 ft (beyond that the canopy texture takes over). */

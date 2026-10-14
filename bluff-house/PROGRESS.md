@@ -1,6 +1,6 @@
 # Bluff House walkthrough: progress
 
-## Status: Stage 5 (Baked GI + reflection probes) done, waiting for approval
+## Status: Stage 6 (Performance + polish) done, waiting for approval
 
 | Stage | Status |
 |---|---|
@@ -8,8 +8,8 @@
 | 2. Tour + UI | ✅ approved, proof in `proof/stage2/` |
 | 3. Materials + realtime lighting | ✅ approved, proof in `proof/stage3/` |
 | 4. Furniture + exterior | ✅ approved, proof in `proof/stage4/` |
-| 5. Baked GI + reflection probes | ✅ done, proof in `proof/stage5/` |
-| 6. Performance + polish | ⏳ next |
+| 5. Baked GI + reflection probes | ✅ approved, proof in `proof/stage5/` |
+| 6. Performance + polish | ✅ done, proof in `proof/stage6/` |
 | 7. Ship | — |
 
 ## Stage 1: what was built
@@ -203,9 +203,62 @@
 - The bake itself: `pnpm bake` → 56 minutes on 4 cores (2048² atlas, 128 samples, 3 times of day plus AO).
 - The default test timeout went from 3 to 10 minutes. Startup now loads the lightmaps and captures the six probes, and under software rendering the multi-view tests ran past 3 minutes.
 
-## Next (Stage 6: performance + polish)
+## Stage 6: what was built
 
-- Adaptive quality, shader warm-up, LODs, instancing, the loader. A perf report (average / p95 / p99 frame times on High and Medium, draw calls and triangles per tour stop), with the inside draw-call budget back under 250.
+- **Adaptive quality** (`src/render/adaptive.ts`, Quality "Auto"):
+  - Watches a 2-second rolling average of the frame time.
+  - **Over 20 ms → one tier down**, in this order: pixel ratio 1.0 → 0.85 → 0.75, AO 16 → 8 samples, AO off, lake reflection off, shadow map 4096 → 2048 → 1024.
+  - **Under 12 ms for 10 s → one tier up.** Nothing happens between 12 and 20 ms (the hysteresis band).
+  - **Never oscillates:** if a step up costs a step down within 30 s, that tier is locked out for the session (until a resize or a Quality change).
+  - The fps chip shows the tier when Auto has stepped down (e.g. "48 fps · 0.85× res").
+- **No per-frame allocation:**
+  - The tour path, room lookup, level culling, light pools, lake mirror and input now reuse their objects.
+  - **The big find was not an allocation:** two-sided glass is drawn in two passes by three.js, which marks the material changed twice per pane per frame. That forced ~40 shader re-checks every frame (and 472 KB/frame of garbage). Glass and fire now draw in one pass, and the recessed cans got their own material.
+- **KTX2 textures** (`pnpm textures`, `src/materials/prebuilt.ts`):
+  - All 44 procedural texture sets and the 4 lightmaps are baked once into mip-mapped KTX2 (UASTC, Zstandard).
+  - They load in parallel and transcode in a worker to the GPU's compressed format: 1 byte per texel instead of 4. No texture generation at startup.
+  - Textures 11.8 MB, lightmaps 5.3 MB (the PNGs were 10 MB). Without the files the app still generates them in code.
+- **GPU memory cuts:**
+  - The lightmapped surfaces blend the three time-of-day bakes themselves, so the 32 MB blended copy is gone.
+  - The sun's shadow map is allocated by the app with a 1-byte color buffer; three.js's default carried an unused 64 MB one.
+- **LODs:**
+  - **Trees:** past 140 ft a tree swaps to a lite crown (30% of the leaf cards, each bigger, same silhouette), re-sorted twice a second. Trees near the house keep full crowns: a swap there would force a shadow-map re-render.
+  - **The bookcase door** refreshes the sun's shadow 5 times a second while it swings, not every frame.
+  - **Furniture:** every piece has a low-detail twin (plain boxes, 6-sided cylinders): 29k triangles instead of 181k. A floor shows its twins when the camera is more than 50 ft from it (the lawn, the dock, the water).
+- **Instancing:** books, bottles and recessed cans are instanced. Chairs and stools are merged per floor and material, which is even fewer draw calls than instancing.
+- **Loader + shader warm-up:** the loader stays up until the baked lighting is in (at most 15 s on a slow line). Every shader, including the Furnished-fade variants, compiles behind it in parallel (`compileAsync`). The first frame is the finished lighting: no pop, no hitch.
+- **Mirror pass:** skipped when no water is in view, and it leaves the interiors out (invisible upside down through glass at half resolution).
+- **Perf tools:**
+  - `?perf` plays the tour in real time on High then Medium and shows a report.
+  - `pnpm perf` does that on your laptop's real GPU and writes `perf-report.md`.
+  - A GPU memory counter (`src/perf/gpumem.ts`) tracks every texture, buffer and renderbuffer allocation.
+
+## Stage 6 proof
+
+`pnpm test`: **41 passing**, 2 opt-in skipped (the video recorder and the laptop perf run).
+
+- **The perf report:** `proof/stage6/perf-report.md`. Every number below is from the whole guided tour (all 33 stops plus frames in between), on High and on Medium.
+
+| Budget | Measured | Limit |
+|---|---|---|
+| Draw calls inside (main scene pass) | **223** | 250 |
+| Draw calls outside | **232** | 400 |
+| Triangles, worst frame | **890,065** | 1.5 M |
+| GPU memory at 1920×1080, High | **303 MB** (was 538) | 350 MB |
+| Download | **33.8 MB** | 60 MB |
+| First view | 15.82 s *in software* (was 28 s) | < 6 s, checkable only on a GPU |
+
+- **Frame times (avg / p95 / p99):** not measurable here: this container has no GPU. **Run `pnpm perf` on your laptop** (one line; ~15 minutes) and it writes them to `perf-report.md`. The pipeline is tested end to end here (`proof/stage6/perf-mode-smoke.md`, `perf-mode-overlay.png`), but at 20× tour speed in software, so its timings are meaningless.
+- `tests/perf.spec.ts` (7 tests):
+  - **Adaptive quality:** sustained 30 ms frames step down one tier every ~2 s in order to the floor (pixel ratio, AO, lake, shadows); 15 ms changes nothing for a minute; 8 ms steps up once per 10 s. **The oscillation trap:** a 60 Hz probe up that fails locks the tier out, then 2 minutes of calm change nothing. A 1-second hitch is ignored. Logs in `adaptive.json`.
+  - **Frame loop:** 1,622 bytes/frame attributed to app code after warm-up (was 472 KB), and **0 shader re-checks per frame** (was ~40). Heap-sampling details in `allocation.json`.
+  - **Shadows:** the 16-bit shadow map renders the same as three.js's own (to 0.07%), and the bath is lit the same with the lake mirror on or off.
+  - **LODs** switch where they should (kitchen vs. the water).
+  - **Budgets** on the tour; **download and first view** from a production build; **perf mode** end to end.
+- `tests/tour.spec.ts`: new test: **all 33 dwell stops hold for their full time** (two were being skipped; see decision 41).
+- `proof/stage6/views/` and `contact-sheet.jpg`: the 11 fixed views × 3 times, new baselines in `tests/baselines/stage6/`.
+  - 0 Inf/NaN pixels; clipping ≤ 0.48%.
+  - Against the Stage 5 baselines: largest difference 0.06 RMSE (loft at noon), so the KTX2 textures, 128 probes and AO change are visually equivalent.
 
 ## Walkthrough video (`tests/record.spec.ts`)
 
@@ -299,20 +352,34 @@
     - Rooms without a probe keep the Stage 3 stand-in.
 31. **Lightmap UVs come from Blender's Smart UV Project** (one of the two options the spec names; xatlas was the other). No new dependency.
 
+### Stage 6 decisions
+
+32. **The draw-call budget counts the main scene pass** (what the camera sees, shadows excluded since they re-render only on change). The whole frame adds the lake mirror pass (≈ 30 calls inside, ≈ 70 from the water) and the post chain (≈ 35 full-screen passes). Both figures are in every report.
+33. **GPU memory is measured at 1920×1080 on High** after the whole tour. Screen-sized buffers scale with the window: at 2560×1440 or a 1.5× pixel ratio expect roughly 100 MB more. Your laptop's `pnpm perf` reports the figure for your real screen.
+34. **KTX2 by baking the procedural textures once** (`pnpm textures`, with `ktx2-encoder`, MIT). UASTC rather than ETC1S: ETC1S files are smaller, but it smears fine wood grain and stone into blotches. The files are committed (17 MB), like the lightmaps. If they're missing, the app generates the textures in code as before.
+35. **Adaptive quality on a 60 Hz screen:** a vsync-locked display never shows frames under 16.7 ms, so "under 12 ms" can't happen there. A steady lock (every frame 16–17.5 ms for 10 s) counts as headroom for one *probe* step up. If that step costs a step down within 30 s, the tier is locked out, so it can't oscillate.
+36. **Chairs and stools are merged, not instanced.** Each floor's furniture of one material is one mesh, which is fewer draw calls than one instanced mesh per model. Books, bottles and recessed cans are instanced (they're the same model hundreds of times).
+37. **The loader waits for the baked lighting** (≤ 15 s), so first view includes the lightmaps and probes. On a slow connection the walkthrough starts with real-time lighting and the bake swaps in when it arrives.
+38. **`pnpm perf` runs with vsync off** so frame times show each frame's real cost (7 ms reads 7 ms, not 16.7). It uses your installed Chrome on your real GPU.
+39. **The no-allocation test allows 2 KB per frame** of app-attributed heap. That covers V8's boxing of decimal numbers and three-mesh-bvh's ray-hit objects (the floor probe under the camera). No app objects, arrays, strings or closures are created per frame. three.js itself allocates ~0.2 MB/frame in its uniform uploads; that's outside this project's code.
+40. **Interior reflection probes went from 256 to 128 per face**, and so did the stand-in. Side by side the room views are indistinguishable (the floors are glossy, not mirrors), and it saves ~35 MB.
+
+41. **Two older bugs found and fixed by the new checks:**
+    - **The tour skipped stops.** Whenever a step landed within 1/1000 ft short of a stop, the tour walked past without pausing. It missed **stop 41 (the deck's lake view) and stop 99**, and it never held at **Front Entry** at the start. All 33 dwell stops now hold for their full time (new test in `tour.spec.ts`). The tour is 8 s longer, and **it now opens with a 3-second hold on the front entry**, as the data always said.
+    - **Shadows could lose their casters.** The sun's shadow map refreshes on the first render after a change, and that was sometimes the lake's mirror pass, which hides furniture (Stage 4) and now the interiors. The mirror pass now leaves the refresh to the main pass (new test in `perf.spec.ts`).
+    - A third bug was my own, this stage: the hand-allocated shadow map skipped three.js's shadow-camera refresh, and noon sun leaked through the roof. Caught by comparing the Stage 6 views with Stage 5's before committing, and fixed.
+
 ## Known issues (to fix in later stages)
 
-- **The bake doesn't follow edits:** change the house in the JSON and the lightmaps no longer match. The app detects that (mesh name and triangle count), says so in the console, and falls back to real-time lighting until `pnpm bake` is re-run (~1 hour on 4 cores).
+- **The bake doesn't follow edits:** change the house in the JSON and the lightmaps no longer match. The app detects that (mesh name and triangle count), says so in the console, and falls back to real-time lighting until `pnpm bake` is re-run (~1 hour on 4 cores), then `pnpm textures` for the KTX2 copies.
 - A few very thin surfaces (door-jamb reveals) get very few lightmap texels and read slightly dark.
 - Probes switch at room boundaries rather than blending, so a reflection can change as you cross a doorway.
-- The lightmaps add ~10 MB to the download (three 2048² PNGs plus AO). Stage 6 can move them to KTX2.
 
 - The terrain is a 2-ft grid, so a 2-ft sloped "trench" shows outside buried lower-level walls (Stage 4: finer grid near the house).
-- Quality "Auto" equals "High" until the adaptive system in Stage 6. Medium and Low already change the pixel ratio and shadow-map size.
-- The loader bar is honest but trivial for now: there are no downloaded assets until Stage 4.
 - Some interior light leaks: the RectAreaLights and point lights have no shadows, so a little daylight or lamplight reaches surfaces it shouldn't (Stage 5's bake fixes this).
-- **Draw calls inside are 5–7 over budget in two views** (foyer 255, kitchen 257 vs 250): trees and landscape seen through the glass add ~20. Stage 6 will merge the outdoor fixtures, put trees on a distance/visibility switch from inside, and add LODs.
 - The trees are stylized (procedural leaf cards), not photo-scanned glTF trees, and the canopy texture repeats visibly on the far hills up close.
 - From the dock at night the bluff is mostly dark apart from the step lights. That's realistic, but a moon or more landscape light would read better.
 - Downloaded models swap in automatically, but their per-model materials won't merge, so each one adds draw calls (Stage 6 merges them).
-- Headless frame rates are SwiftShader (software) numbers and say nothing about real GPU speed.
-- The interior draw-call counts include the shadow pass and stay under 250. They will grow with furniture (Stage 4).
+- Headless frame rates are SwiftShader (software) numbers and say nothing about real GPU speed. **The real frame times (avg / p95 / p99) come from `pnpm perf` on your laptop:** this container has no GPU.
+- First view here is ~28 s, all of it software rendering (shader compiles and six probe captures on the CPU). The < 6 s budget can only be checked on a real GPU (`pnpm perf` reports it).
+- A step of adaptive quality that changes the AO sample count recompiles N8AO's shader: a one-off hitch of a few frames. Steps are at least 2 s apart and can't oscillate.

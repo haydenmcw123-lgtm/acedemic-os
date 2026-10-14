@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { material, type Variant } from '../materials/library';
 
 /**
@@ -7,8 +8,9 @@ import { material, type Variant } from '../materials/library';
  * sun's direct light (indirect bounce from sun and sky, plus sky light through the windows); the
  * sun itself stays real-time with its sharp shadow map, and so do the electric lights.
  *
- * As the clock moves, the three maps are blended on the GPU into one half-float texture (a single
- * full-screen pass, at most every 250 ms). Night is the noon bake × 0.05.
+ * As the clock moves, the surfaces blend the three maps themselves (three texture reads, weights
+ * from the clock): no blended copy in GPU memory. Night is the noon bake × 0.05. The maps load as
+ * KTX2 (block-compressed on the GPU) when `pnpm textures` has made them, else as the PNGs.
  *
  * On baked surfaces the lightmap *replaces* the stand-in fill lights (hemisphere, window
  * RectAreaLights, sky-environment diffuse) — that is what removes the light leaks — and the baked
@@ -32,18 +34,13 @@ export class Lightmaps {
   readonly receivers: { mesh: THREE.Mesh; live: THREE.Material; baked: THREE.Material }[] = [];
   private maps: THREE.Texture[] = [];
   private ao: THREE.Texture | null = null;
-  private rt: THREE.WebGLRenderTarget | null = null;
-  private blend!: THREE.ShaderMaterial;
-  private quad!: THREE.Mesh;
-  private cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  private quadScene = new THREE.Scene();
   private manifest: Manifest | null = null;
   private weights = new THREE.Vector4(0, 1, 0, 1); // morning, noon, golden, scale
-  private dirty = true;
-  private timer = 0;
+  /** Which files were used: 'ktx2' or 'png'. */
+  format = '';
   problems: string[] = [];
 
-  constructor(private renderer: THREE.WebGLRenderer) {}
+  constructor(private ktx2: KTX2Loader | null = null) {}
 
   /** Loads the bake (if there is one) and applies it to the meshes it was baked for. */
   async load(groups: Iterable<THREE.Object3D>, base = `${import.meta.env.BASE_URL}lightmaps/`) {
@@ -54,33 +51,21 @@ export class Lightmaps {
       m = await r.json();
     } catch { return false; }
     const uv = new Float32Array(await (await fetch(base + m.uv2)).arrayBuffer());
-    const loader = new THREE.TextureLoader();
-    const load = (f: string) => loader.loadAsync(base + f).then((t) => {
-      t.colorSpace = f === m.ao ? THREE.NoColorSpace : THREE.SRGBColorSpace;
-      t.channel = 1; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; // flipY stays on: Blender UV (0,0) is the bottom-left
+    // KTX2 if `pnpm textures` made it (flipped at encode time), else the PNG (flipY on: Blender's UV
+    // (0,0) is the bottom-left)
+    const ktx = this.ktx2 && (await fetch(base + m.ao.replace(/\.png$/, '.ktx2'), { method: 'HEAD' }).then((r) => r.ok && !(r.headers.get('content-type') ?? '').includes('html')).catch(() => false));
+    this.format = ktx ? 'ktx2' : 'png';
+    const png = new THREE.TextureLoader();
+    const load = async (f: string) => {
+      const t = ktx ? await this.ktx2!.loadAsync(base + f.replace(/\.png$/, '.ktx2')) : await png.loadAsync(base + f);
+      if (!ktx) t.colorSpace = f === m.ao ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+      t.channel = 1; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter;
       return t;
-    });
+    };
     const byName = new Map(m.times.map((t) => [t.name, t]));
     const order = ['morning', 'noon', 'golden'].map((n) => byName.get(n) ?? m.times[0]);
     this.maps = await Promise.all(order.map((t) => load(t.file)));
     this.ao = await load(m.ao);
-
-    // the blended lightmap
-    this.rt = new THREE.WebGLRenderTarget(m.res, m.res, { type: THREE.HalfFloatType, depthBuffer: false });
-    this.rt.texture.channel = 1;
-    this.blend = new THREE.ShaderMaterial({
-      uniforms: { a: { value: this.maps[0] }, b: { value: this.maps[1] }, c: { value: this.maps[2] }, w: { value: this.weights } },
-      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-      fragmentShader: /* glsl */ `
-        uniform sampler2D a, b, c; uniform vec4 w; varying vec2 vUv;
-        void main() {
-          vec3 l = texture2D(a, vUv).rgb * w.x + texture2D(b, vUv).rgb * w.y + texture2D(c, vUv).rgb * w.z;
-          gl_FragColor = vec4(l * w.w, 1.0);
-        }`,
-      depthTest: false, depthWrite: false,
-    });
-    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.blend);
-    this.quadScene.add(this.quad);
 
     // second UV set onto the receivers (matched by mesh name and triangle count)
     const meshes = new Map<string, THREE.Mesh>();
@@ -101,23 +86,25 @@ export class Lightmaps {
     }
     this.manifest = m;
     this.ready = true;
-    this.dirty = true;
     return true;
   }
 
   private patch(m: THREE.MeshStandardMaterial, intensity: number) {
     m.userData.lightmapped = true;
-    m.lightMap = this.rt!.texture;
+    m.lightMap = this.maps[1]; // noon; morning and golden come in as extra uniforms
     m.lightMapIntensity = intensity;
-    const ao = this.ao!;
+    const ao = this.ao!, [a, , c] = this.maps, w = this.weights;
     m.onBeforeCompile = (sh) => {
       sh.uniforms.bakedAO = { value: ao };
+      sh.uniforms.lmMorning = { value: a }; sh.uniforms.lmGolden = { value: c }; sh.uniforms.lmWeights = { value: w };
       const maps = THREE.ShaderChunk.lights_fragment_maps
+        .replace('vec4 lightMapTexel = texture2D( lightMap, vLightMapUv );',
+          'vec4 lightMapTexel = vec4( ( texture2D( lmMorning, vLightMapUv ).rgb * lmWeights.x + texture2D( lightMap, vLightMapUv ).rgb * lmWeights.y + texture2D( lmGolden, vLightMapUv ).rgb * lmWeights.z ) * lmWeights.w, 1.0 );')
         .replace('irradiance += lightMapIrradiance;', 'irradiance = lightMapIrradiance; // baked: replaces ambient + hemisphere fill\n\t\tbakedOcc = texture2D( bakedAO, vLightMapUv ).r;')
         .replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '// baked: the lightmap carries the sky light')
         .replace('radiance += iblRadiance;', 'radiance += iblRadiance * mix( 1.0, bakedOcc, 0.85 ); // keep reflections out of corners');
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <lightmap_pars_fragment>', '#include <lightmap_pars_fragment>\nuniform sampler2D bakedAO;')
+        .replace('#include <lightmap_pars_fragment>', '#include <lightmap_pars_fragment>\nuniform sampler2D bakedAO, lmMorning, lmGolden; uniform vec4 lmWeights;')
         .replace('#include <lights_fragment_begin>', '#undef RE_Direct_RectArea // window fill light is in the bake\n#include <lights_fragment_begin>\nfloat bakedOcc = 1.0;')
         .replace('#include <lights_fragment_maps>', maps);
     };
@@ -139,19 +126,7 @@ export class Lightmaps {
     // night: whatever daylight is left, plus the noon bake × 0.05
     const night = 1 - Math.min(1, scale);
     wm *= scale; wn = wn * scale + 0.05 * night; wg *= scale;
-    this.weights.set(wm, wn, wg, 1);
-    this.dirty = true;
-  }
-
-  /** Re-blends the lightmap if the time changed (at most every 250 ms unless forced). */
-  update(dt: number, force = false) {
-    this.timer -= dt;
-    if (!this.ready || !this.dirty || (this.timer > 0 && !force)) return;
-    this.timer = 0.25; this.dirty = false;
-    const prev = this.renderer.getRenderTarget();
-    this.renderer.setRenderTarget(this.rt);
-    this.renderer.render(this.quadScene, this.cam);
-    this.renderer.setRenderTarget(prev);
+    this.weights.set(wm, wn, wg, 1); // a shared uniform: every lightmapped surface sees it at once
   }
 
   /** Baked GI on/off (before/after comparisons): off puts the real-time stand-in lighting back. */
@@ -160,5 +135,5 @@ export class Lightmaps {
     for (const r of this.receivers) r.mesh.material = on ? r.baked : r.live;
   }
 
-  get info() { return { ready: this.ready, receivers: this.receivers.length, problems: this.problems, res: this.manifest?.res ?? 0, weights: this.weights.toArray() }; }
+  get info() { return { ready: this.ready, receivers: this.receivers.length, problems: this.problems, res: this.manifest?.res ?? 0, weights: this.weights.toArray(), format: this.format }; }
 }

@@ -11,6 +11,7 @@ import { buildOutdoorLights } from './lighting/outdoor';
 import { Furniture } from './furniture/furnish';
 import { loadModels } from './furniture/models';
 import { LOOSE_MATERIALS } from './materials/library';
+import { ktx2, loadPrebuiltTextures } from './materials/prebuilt';
 import { FLOOR_Y, house, squareFootage, validateHouse } from './data/house';
 import { fmtClock } from './lighting/sun';
 import { InteriorLights } from './lighting/interior';
@@ -21,18 +22,25 @@ import { PlayerController } from './player/controller';
 import { Director } from './player/director';
 import { Input } from './player/input';
 import { Tour } from './player/tour';
+import { AdaptiveQuality, TIERS, type Tier } from './render/adaptive';
 import { LevelCuller } from './render/culling';
 import { installHeightFog } from './render/fog';
 import { Post, POST_PRESETS } from './render/post';
-import { createRenderer } from './render/renderer';
+import { allocShadowMap, createRenderer } from './render/renderer';
 import { installTestApi } from './test-api';
+import { gpuMemory, installGpuMemoryCounter } from './perf/gpumem';
+import { downloadMB, gpuName, PerfRecorder, showReport, type PassStats } from './perf/perfmode';
 import { Caption } from './ui/caption';
 import { Dock, type Quality } from './ui/dock';
 import { RoomLabels } from './ui/labels';
 import { Measure } from './ui/measure';
 import { whereAt } from './ui/where';
 
-const TEST = new URLSearchParams(location.search).has('test');
+const params = new URLSearchParams(location.search);
+const TEST = params.has('test');
+/** `?perf` (or `?perf=high,medium,low`): play the tour once per quality and report frame times. */
+const PERF = params.has('perf') ? (params.get('perf') || 'high,medium').split(',') as Quality[] : null;
+if (TEST || PERF) installGpuMemoryCounter(); // before the renderer exists
 installHeightFog(); // before any material compiles
 
 const errs = validateHouse(house);
@@ -45,6 +53,9 @@ console.info(
 console.info(`Sun on ${house.location.date}: sunrise ${fmtClock(DAY.sunrise)}, solar noon ${fmtClock(DAY.solarNoon)}, sunset ${fmtClock(DAY.sunset)} (EDT)`);
 
 const rig = createRenderer(document.getElementById('stage')!, TEST);
+// the pre-baked KTX2 textures (pnpm textures) before anything uses a material; else generated in code
+const prebuilt = await loadPrebuiltTextures(rig.renderer);
+console.info(prebuilt ? `Textures: ${prebuilt} pre-baked KTX2 sets` : 'Textures: generated in code (run pnpm textures for KTX2)');
 const built = buildHouse(house);
 rig.scene.add(built.root, built.collider);
 {
@@ -67,7 +78,7 @@ console.info(`Landscape: ${trees.count} near trees, mid-distance impostors, far 
 const furniture = new Furniture(house, built.groups);
 {
   const fs = furniture.stats();
-  console.info(`Furniture: ${fs.items} items from the JSON in ${fs.meshes} merged meshes (${fs.tris.toLocaleString()} tris), ${fs.blockers} colliders`);
+  console.info(`Furniture: ${fs.items} items from the JSON in ${fs.meshes} merged meshes (${fs.tris.toLocaleString()} tris; far-away twins ${fs.loTris.toLocaleString()}), ${fs.blockers} colliders`);
   for (const r of furniture.report) console.warn('furniture: ' + r);
 }
 const player = new PlayerController(built.bvh, [...built.ctx.dynamic.map((d) => d.blocker), ...furniture.blockers]);
@@ -87,7 +98,7 @@ const post = new Post(rig.renderer, rig.scene, rig.camera, 'agx');
 rig.onResize.push((w, h) => post.setSize(w, h));
 const time = new TimeOfDay(rig, sky, interior, new InteriorEnv(rig.renderer));
 // baked GI (Stage 5): loads in the background; until it arrives the real-time stand-in lighting shows
-const lightmaps = new Lightmaps(rig.renderer);
+const lightmaps = new Lightmaps(ktx2(rig.renderer));
 const probes = new Probes(rig.renderer, rig.scene, built.plan);
 let probeRoom: string | null | undefined;
 /** Room probes: the probe of the room the camera is in drives interior reflections. */
@@ -101,9 +112,8 @@ function updateProbe(force = false) {
 const lightmapsLoaded = lightmaps.load([...built.groups.values()]).then((ok) => {
   probes.patchMaterials();
   if (ok) {
-    lightmaps.setTime(time.hour, daylightAt); lightmaps.update(0, true);
+    lightmaps.setTime(time.hour, daylightAt);
     probes.captureAll(); // all six behind the loader: walking into a room never waits on a capture
-    rig.renderer.compile(rig.scene, rig.camera);
     console.info(`Baked GI: ${lightmaps.receivers.length} surfaces lightmapped`);
   } else console.info('Baked GI: no lightmaps (run pnpm bake): real-time lighting only');
   for (const p of lightmaps.problems) console.warn('lightmaps: ' + p);
@@ -114,8 +124,14 @@ time.outdoor = (deep, haze, dir, sunColor, sunI, skyCol, skyI) => {
   // impostors are unlit billboards: give them the same sun + sky light the real trees get
   impostorLight.uniforms.light.value.copy(sunColor).multiplyScalar(sunI * 0.12 * Math.max(0, dir.y + 0.15)).add(skyCol.clone().multiplyScalar(skyI * 1.6));
 };
-// the mirror pass runs before the post chain (never inside the AO pass); interior furniture is left out of it
-lake.hideInReflection = [...built.groups.values()].filter((g) => g.name !== 'site').flatMap((g) => g.children.filter((c) => c.name.startsWith('furniture:')));
+// the mirror pass runs before the post chain (never inside the AO pass). The interiors are left out
+// of it: through the glass, upside down, rippled and at half resolution they are invisible, and
+// skipping them roughly halves the pass's draw calls. So is the furniture on the shell (covered decks).
+// Anything holding a light stays (the fires): a light that vanishes for one pass changes the light
+// setup between passes, and three re-checks every lit shader twice a frame.
+const INTERIOR_GROUPS = new Set(['L0i', 'L1i', 'L2i', 'stair']);
+const hasLight = (o: THREE.Object3D) => { let l = false; o.traverse((c) => { if ((c as THREE.Light).isLight) l = true; }); return l; };
+lake.hideInReflection = [...built.groups].flatMap(([k, g]) => (INTERIOR_GROUPS.has(k) ? g.children : k === 'site' ? [] : g.children.filter((c) => c.name.startsWith('furniture:'))).filter((c) => !hasLight(c)));
 post.beforeRender = (dt) => lake.render(rig.renderer, rig.scene, rig.camera, dt);
 rig.onResize.push((w, h) => lake.setSize(w, h));
 console.info(`Lights: ${interior.counts.cans} recessed cans, ${interior.counts.clusters} room light clusters, ${interior.counts.windows} daylight glass walls`);
@@ -123,21 +139,30 @@ const caption = new Caption();
 const labels = new RoomLabels(built.bvh, built.opaque);
 const measure = new Measure(rig.scene, built.bvh);
 
-// ---- quality (adaptive "Auto" arrives in Stage 6; until then it equals High) ----
-function setQuality(q: Quality) {
-  const ratio = { auto: 1, high: 1, medium: 0.85, low: 0.75 }[q];
-  rig.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5) * ratio);
-  post.apply(POST_PRESETS[q === 'auto' ? 'high' : q]);
-  lake.enabled = q !== 'low'; // Low drops the lake reflection (the water shows the sky color)
-  const sm = { auto: 4096, high: 4096, medium: 2048, low: 1024 }[q];
-  if (rig.sun.shadow.mapSize.x !== sm) {
-    rig.sun.shadow.mapSize.set(sm, sm);
-    rig.sun.shadow.map?.dispose(); rig.sun.shadow.map = null;
-    rig.renderer.shadowMap.needsUpdate = true;
-  }
+// ---- quality: High / Medium / Low are fixed; Auto adapts to the frame time (src/render/adaptive.ts) ----
+let quality: Quality = 'auto';
+function applyTier(t: Tier) {
+  rig.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5) * t.pixelRatio);
+  post.apply({ ...POST_PRESETS.high, ao: t.ao, aoSamples: t.aoSamples });
+  lake.enabled = t.lake; // without it the water shows the sky color
+  if (rig.sun.shadow.mapSize.x !== t.shadow) { allocShadowMap(rig.sun, t.shadow); rig.renderer.shadowMap.needsUpdate = true; }
   rig.resize();
+}
+const FIXED: Record<Exclude<Quality, 'auto'>, Tier> = {
+  high: { label: 'high', pixelRatio: 1, ao: true, aoSamples: 16, lake: true, shadow: 4096 },
+  medium: { label: 'medium', pixelRatio: 0.85, ao: true, aoSamples: 8, lake: true, shadow: 2048 },
+  low: { label: 'low', pixelRatio: 0.75, ao: false, aoSamples: 8, lake: false, shadow: 1024 },
+};
+const adaptive = new AdaptiveQuality((t) => { if (quality === 'auto') applyTier(t); });
+function setQuality(q: Quality) {
+  quality = q;
+  if (q === 'auto') { adaptive.reset(); applyTier(TIERS[0]); }
+  else applyTier(FIXED[q]);
+  if (q === 'low') post.apply(POST_PRESETS.low); // Low also drops bloom
   dock.setQuality(q);
 }
+// a new window size changes the cost of every pixel: Auto starts again from the top
+addEventListener('resize', () => { if (quality === 'auto') adaptive.reset(); });
 
 // ---- UI ----
 const chip = document.getElementById('chip')!, chipText = document.getElementById('chipText')!;
@@ -205,24 +230,31 @@ input.on('KeyC', () => { built.collider.visible = !built.collider.visible; });
 const jump: [number, number, number][] = [[21, 23, FLOOR_Y[0]], [13, 33, FLOOR_Y[1]], [28, 19.6, FLOOR_Y[2]]];
 (['Digit1', 'Digit2', 'Digit3'] as const).forEach((k, i) => input.on(k, () => { director.pause(); player.teleport(jump[i][0], jump[i][1], jump[i][2]); }));
 
-let probeTimer = 0;
+let probeTimer = 0, doorShadowT = 0, doorSettle = false;
 /** One simulation + presentation step. Shared by the render loop and the test driver. */
 function step(dt: number) {
   input.update();
   if (director.mode === 'tour' && input.moving) director.pause();
   const look = input.consumeLook();
   director.update(dt, input.move, look);
-  for (const d of built.ctx.dynamic) {
-    const before = d.blocker.rot;
+  // the bookcase door's shadow: while it swings, the 4096² shadow map refreshes 5 times a second
+  // (not every frame), and once more when it comes to rest
+  let moving = false;
+  for (let i = 0; i < built.ctx.dynamic.length; i++) {
+    const d = built.ctx.dynamic[i], before = d.blocker.rot;
     d.update(player.x, player.z, player.feet, dt);
-    if (Math.abs(d.blocker.rot - before) > 1e-4) rig.renderer.shadowMap.needsUpdate = true; // the bookcase door's shadow
+    if (Math.abs(d.blocker.rot - before) > 1e-4) moving = true;
   }
+  doorShadowT -= dt;
+  if (moving && doorShadowT <= 0) { doorShadowT = 0.2; rig.renderer.shadowMap.needsUpdate = true; doorSettle = true; }
+  else if (!moving && doorSettle) { doorSettle = false; rig.renderer.shadowMap.needsUpdate = true; }
   culler.update(player.x, player.z, player.feet);
   furniture.update(dt);
   if (furniture.shadowsDirty) { furniture.shadowsDirty = false; rig.renderer.shadowMap.needsUpdate = true; }
   director.apply(rig.camera);
+  trees.lod.update(rig.camera.position.x, rig.camera.position.z, false, dt);
+  furniture.updateLod(rig.camera.position);
   time.tick(dt, culler.inside);
-  lightmaps.update(dt);
   probeTimer -= dt;
   if (probeTimer <= 0) { probeTimer = 0.5; updateProbe(); } // re-capture at most twice a second
   wind.time.value += dt;
@@ -238,17 +270,20 @@ const fpsEl = document.getElementById('fps')!;
 let frameMs = 16, fpsT = 0;
 function frame(now: number) {
   timer.update(now);
-  const dt = Math.min(0.05, timer.getDelta());
+  const raw = timer.getDelta(), dt = Math.min(0.05, raw);
+  if (quality === 'auto') adaptive.sample(raw * 1000);
   step(dt);
   labels.update(rig.camera, player.feet, dt);
   measure.update(rig.camera);
+  if (perf) rig.renderer.info.reset(); // perf: count the whole frame (mirror pass + scene + AO + post)
   post.render(dt);
+  if (perf) perfFrame(raw * 1000);
   frameMs = frameMs * 0.95 + dt * 1000 * 0.05;
   fpsT += dt;
-  if (fpsT > 0.5) { fpsT = 0; fpsEl.textContent = `${(1000 / frameMs).toFixed(0)} fps`; }
+  if (fpsT > 0.5) { fpsT = 0; fpsEl.textContent = `${(1000 / frameMs).toFixed(0)} fps` + (quality === 'auto' && adaptive.tier ? ` · ${adaptive.label}` : ''); }
 }
 
-// ---- boot: first frame rendered behind the loader, then a 600 ms fade (no black flash) ----
+// ---- boot: everything compiled and the first frame rendered behind the loader, then a 600 ms fade ----
 setQuality('auto');
 time.set(17.75);
 dock.setTour(true);
@@ -258,20 +293,61 @@ interior.update(rig.camera.position, player.feet, culler.inside, 0, true);
 post.exposure.exposure = time.exposure;
 rig.renderer.shadowMap.needsUpdate = true;
 rig.resize();
-rig.renderer.compile(rig.scene, rig.camera); // shader warm-up behind the loader
-// …including the see-through variants the Furnished fade uses, so toggling F never hitches
-for (const m of LOOSE_MATERIALS) m.transparent = true;
-rig.renderer.compile(rig.scene, rig.camera);
-for (const m of LOOSE_MATERIALS) m.transparent = false;
-post.render(0);
-const loader = document.getElementById('loader')!;
-(document.getElementById('loaderBar') as HTMLElement).style.width = '100%';
-requestAnimationFrame(() => { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 650); });
+const loader = document.getElementById('loader')!, loaderBar = document.getElementById('loaderBar') as HTMLElement;
+loaderBar.style.width = '70%';
+document.getElementById('loaderMsg')!.textContent = 'Lighting the rooms…';
+let firstViewMs = 0;
+/**
+ * The loader stays up until the baked lighting is in (normally well under a second after the house
+ * is built; at most 15 s on a slow connection), so the first view is the finished lighting with no
+ * pop and no shader hitch a moment later. Shaders compile in parallel where the driver allows it
+ * (KHR_parallel_shader_compile), including the see-through variants the Furnished fade uses.
+ */
+const booted = (async () => {
+  let late = false;
+  await Promise.race([lightmapsLoaded, new Promise<void>((r) => setTimeout(() => { late = true; r(); }, 15_000))]);
+  if (late) console.warn('Baked GI is late: showing real-time lighting first');
+  updateProbe(true);
+  await rig.renderer.compileAsync(rig.scene, rig.camera);
+  for (const m of LOOSE_MATERIALS) m.transparent = true;
+  await rig.renderer.compileAsync(rig.scene, rig.camera);
+  for (const m of LOOSE_MATERIALS) m.transparent = false;
+  post.render(0);
+  loaderBar.style.width = '100%';
+  requestAnimationFrame(() => { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 650); });
+  firstViewMs = performance.now(); // since navigation start: the first frame is up behind the fade
+  console.info(`First view at ${(firstViewMs / 1000).toFixed(2)} s`);
+})();
+
+// ---- perf mode: the tour, in real time, once per quality ----
+let perf: PerfRecorder | null = null, perfQ = 0, perfWait = 0;
+const perfPasses: PassStats[] = [];
+function perfFrame(ms: number) {
+  if (perfWait > 0) { perfWait -= ms; if (perfWait <= 0) { director.restart(); perf!.begin(); } return; } // settle after a switch, then the tour from its first stop
+  perf!.frame(ms, rig.renderer.info, post.sceneCalls, culler.inside, tour.dwellStop);
+  if (director.mode === 'tour') return;
+  perfPasses.push(perf!.end(PERF![perfQ]));
+  if (++perfQ < PERF!.length) { setQuality(PERF![perfQ]); perfWait = 1500; return; }
+  const report = {
+    userAgent: navigator.userAgent, gpu: gpuName(rig.renderer.getContext() as WebGL2RenderingContext),
+    viewport: `${innerWidth}×${innerHeight}`, pixelRatio: devicePixelRatio, firstViewMs: Math.round(firstViewMs),
+    downloadMB: downloadMB(), gpuMemoryMB: Math.max(perf!.gpuPeakMB, Math.round(gpuMemory.total / 1048576)), passes: perfPasses,
+  };
+  perf = null; rig.renderer.info.autoReset = true;
+  (window as unknown as { __perfReport: unknown }).__perfReport = report;
+  console.info('Perf report: ' + JSON.stringify(report));
+  showReport(report);
+}
+if (PERF) void booted.then(() => {
+  perf = new PerfRecorder(house.tourStops, () => whereAt(built.plan, player.x, player.z, player.feet).name);
+  tour.mult = +(params.get('perfSpeed') ?? 1) || 1; // smoke tests run the tour fast; real runs at 1×
+  rig.renderer.info.autoReset = false;
+  setQuality(PERF[0]); perfWait = 2000;
+});
 
 /** Renders one fully settled frame (tests): env map, shadows, lights and exposure all up to date. */
 function renderSettled() {
   time.tick(0, culler.inside, true);
-  lightmaps.update(0, true);
   updateProbe(true);
   interior.update(rig.camera.position, player.feet, culler.inside, 0, true);
   post.exposure.exposure = time.exposure;
@@ -280,5 +356,5 @@ function renderSettled() {
 }
 // downloaded furniture models (if any) replace their stand-ins as they arrive
 void loadModels(furniture).then((n) => { if (n) console.info(`Furniture: ${n} downloaded models in place of their stand-ins`); });
-if (TEST) void lightmapsLoaded.then(() => installTestApi({ rig, built, furniture, lake, lightmaps, probes, setBaked, player, culler, director, tour, time, caption, labels, measure, step, post, interior, renderSettled, squareFootage: sf }));
-else rig.renderer.setAnimationLoop(frame);
+if (TEST) void booted.then(() => installTestApi({ rig, built, furniture, lake, lightmaps, probes, setBaked, adaptive, trees, setQuality, player, culler, director, tour, time, caption, labels, measure, step, post, interior, renderSettled, squareFootage: sf }));
+else void booted.then(() => rig.renderer.setAnimationLoop(frame));

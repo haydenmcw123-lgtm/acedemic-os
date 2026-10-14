@@ -1,0 +1,125 @@
+{
+  "perFrame": {
+    "frames": 90,
+    "sampledBytesTotal": 16567928,
+    "appBytes": 145944,
+    "appBytesPerFrame": 1622,
+    "top": [
+      [
+        "src/render/lake.ts:118 render",
+        28824
+      ],
+      [
+        "src/player/tour.ts:131 pose",
+        18348
+      ],
+      [
+        "src/player/director.ts:91 update",
+        16788
+      ],
+      [
+        "src/player/controller.ts:57 groundAt",
+        14676
+      ],
+      [
+        "src/player/tour.ts:103 update",
+        10752
+      ],
+      [
+        "src/main.ts:252 step",
+        10740
+      ],
+      [
+        "src/player/tour.ts:72 at",
+        8916
+      ],
+      [
+        "src/lighting/interior.ts:82 update",
+        7860
+      ],
+      [
+        "src/render/post.ts:60 Post.scenePass.render",
+        4820
+      ],
+      [
+        "src/player/director.ts:136 bob",
+        4188
+      ],
+      [
+        "src/player/tour.ts:164 near",
+        4188
+      ],
+      [
+        "src/build/openings.ts:201 update",
+        2628
+      ],
+      [
+        "src/player/tour.ts:3 sstep",
+        2616
+      ],
+      [
+        "src/lighting/timeofday.ts:91 tick",
+        2100
+      ],
+      [
+        "src/lighting/probes.ts:54 m.customProgramCacheKey",
+        1600
+      ]
+    ],
+    "libraryTop": [
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:35172 setValueV3f",
+        11407496
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:35238 setValueM4",
+        1188900
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:35224 setValueM3",
+        848792
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:42552 projectObject",
+        417856
+      ],
+      [
+        ":0 sort",
+        343096
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:35505 setValueM4Array",
+        239244
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:40756 refreshMaterialUniforms",
+        233484
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:36479 getParameters",
+        216112
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:40747 refreshFogUniforms",
+        132852
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:35158 setValueV2f",
+        112668
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:40807 refreshUniformsCommon",
+        111372
+      ],
+      [
+        "node_modules/.vite/deps/chunk-NVXLSEBZ.js:1697 setFromRotationMatrix",
+        110052
+      ]
+    ]
+  },
+  "programChecksPerFrame": {
+    "all": 0,
+    "noLake": 0,
+    "noAO": 0
+  }
+}

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { len2 } from '../util/noise';
 import type { MeshBVH } from 'three-mesh-bvh';
 import type { DynamicBlocker } from '../build/context';
 
@@ -57,7 +58,8 @@ export class PlayerController {
     _ray.origin.set(x, top, z); _ray.direction.copy(_down);
     const hits = this.bvh.raycast(_ray, THREE.DoubleSide, 0, range + PLAYER.stepUp);
     let best: number | null = null;
-    for (const h of hits) {
+    for (let i = 0; i < hits.length; i++) {
+      const h = hits[i];
       if (!h.face || h.face.normal.y < PLAYER.walkable) continue;
       const y = h.point.y;
       if (best === null || y > best) best = y;
@@ -133,7 +135,7 @@ export class PlayerController {
     [nx, nz] = this.resolve(nx, nz, g);
     const g2 = this.groundAt(nx, nz, g);
     if (g2 === null || g - g2 > PLAYER.maxDrop) return false;
-    this.walked += Math.hypot(nx - this.x, nz - this.z);
+    this.walked += len2(nx - this.x, nz - this.z);
     this.x = nx; this.z = nz; this.feet = g2;
     return true;
   }
@@ -143,16 +145,16 @@ export class PlayerController {
     const speed = PLAYER.walkSpeed * (input.sprint ? PLAYER.sprint : 1);
     let fx = -Math.sin(this.yaw) * input.forward + Math.cos(this.yaw) * input.right;
     let fz = -Math.cos(this.yaw) * input.forward - Math.sin(this.yaw) * input.right;
-    const fl = Math.hypot(fx, fz);
+    const fl = len2(fx, fz);
     if (fl > 1) { fx /= fl; fz /= fl; }
     const tx = fx * speed, tz = fz * speed;
     const rate = fl > 0.01 ? PLAYER.accel : PLAYER.decel;
     const k = 1 - Math.exp(-rate * dt);
     this.vx += (tx - this.vx) * k; this.vz += (tz - this.vz) * k;
-    if (Math.hypot(this.vx, this.vz) < 0.02 && fl < 0.01) { this.vx = this.vz = 0; }
+    if (len2(this.vx, this.vz) < 0.02 && fl < 0.01) { this.vx = this.vz = 0; }
 
     const dx = this.vx * dt, dz = this.vz * dt;
-    const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.35));
+    const n = Math.max(1, Math.ceil(len2(dx, dz) / 0.35));
     for (let i = 0; i < n; i++) {
       const sx = dx / n, sz = dz / n;
       if (this.tryMove(sx, sz)) continue;
@@ -189,13 +191,13 @@ function blockerPush(b: DynamicBlocker, x: number, z: number, feet: number, r: n
   const lx = wx * c - wz * s, lz = wx * s + wz * c;
   const qx = Math.max(-b.hw, Math.min(b.hw, lx)), qz = Math.max(-b.hd, Math.min(b.hd, lz));
   let ddx = lx - qx, ddz = lz - qz;
-  let d = Math.hypot(ddx, ddz);
+  let d = len2(ddx, ddz);
   if (d >= r) return null;
   if (d < 1e-6) {
     // center inside the box: push out along the shallowest axis
     const px = b.hw - Math.abs(lx), pz = b.hd - Math.abs(lz);
     if (px < pz) { ddx = Math.sign(lx) || 1; ddz = 0; d = -px; } else { ddx = 0; ddz = Math.sign(lz) || 1; d = -pz; }
-    const L = Math.hypot(ddx, ddz); ddx /= L; ddz /= L;
+    const L = len2(ddx, ddz); ddx /= L; ddz /= L;
   } else { ddx /= d; ddz /= d; }
   const push = r - d + 1e-4;
   const plx = ddx * push, plz = ddz * push;

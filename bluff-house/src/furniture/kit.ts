@@ -17,6 +17,12 @@ export type UvMode = 'box' | 'keep' | 'fit';
 export interface Prop { kind: 'book' | 'bottle' | 'bottleLying'; x: number; y: number; z: number; w: number; h: number; d: number; c: number }
 
 export class Kit {
+  /**
+   * Level of detail for the kits built while this is set: 'lo' makes the far-away twin of each
+   * piece (plain boxes instead of rounded ones, 6-sided cylinders, coarse spheres) — the same
+   * shapes and extents with a fraction of the triangles.
+   */
+  static detail: 'hi' | 'lo' = 'hi';
   readonly g = new THREE.Group();
   readonly props: Prop[] = [];
 
@@ -30,7 +36,7 @@ export class Kit {
   rb(mat: string, w: number, h: number, d: number, x: number, y: number, z: number, r = 0.05, ry = 0) {
     const rr = Math.max(0.001, Math.min(r, w / 2 - 0.002, h / 2 - 0.002, d / 2 - 0.002));
     const soft = mat === '@up' || mat === '@duvet' || mat === 'sheet' || mat === '@accent';
-    const geo = r > 0 ? new RoundedBoxGeometry(w, h, d, soft ? 2 : 1, rr) : new THREE.BoxGeometry(w, h, d);
+    const geo = r > 0 && Kit.detail === 'hi' ? new RoundedBoxGeometry(w, h, d, soft ? 2 : 1, rr) : new THREE.BoxGeometry(w, h, d);
     const o = this.mesh(geo, mat);
     o.position.set(x, y + h / 2, z); o.rotation.y = ry;
     return o;
@@ -38,19 +44,20 @@ export class Kit {
   bx(mat: string, w: number, h: number, d: number, x: number, y: number, z: number, ry = 0) { return this.rb(mat, w, h, d, x, y, z, 0, ry); }
   /** Vertical cylinder; (x, y, z) is the bottom center. */
   cy(mat: string, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 16) {
-    const o = this.mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
+    const o = this.mesh(new THREE.CylinderGeometry(rt, rb, h, lod(seg)), mat);
     o.position.set(x, y + h / 2, z);
     return o;
   }
   /** Cylinder lying along an axis, centered at (x, y, z). */
   cyc(mat: string, r: number, len: number, x: number, y: number, z: number, axis: 'x' | 'y' | 'z' = 'x', seg = 14) {
-    const o = this.mesh(new THREE.CylinderGeometry(r, r, len, seg), mat);
+    const o = this.mesh(new THREE.CylinderGeometry(r, r, len, lod(seg)), mat);
     o.position.set(x, y, z);
     if (axis === 'x') o.rotation.z = Math.PI / 2; else if (axis === 'z') o.rotation.x = Math.PI / 2;
     return o;
   }
   sp(mat: string, r: number, x: number, y: number, z: number, sx = 1, sy = 1, sz = 1, det = 14) {
-    const o = this.mesh(new THREE.SphereGeometry(r, det, Math.max(6, (det * 0.75) | 0)), mat);
+    const d = Kit.detail === 'hi' ? det : Math.min(det, 8);
+    const o = this.mesh(new THREE.SphereGeometry(r, d, Math.max(Kit.detail === 'hi' ? 6 : 4, (d * 0.75) | 0)), mat);
     o.position.set(x, y, z); o.scale.set(sx, sy, sz);
     return o;
   }
@@ -60,11 +67,14 @@ export class Kit {
     return o;
   }
   torus(mat: string, r: number, tube: number, x: number, y: number, z: number, rx = 0, ry = 0, arc = Math.PI * 2) {
-    const o = this.mesh(new THREE.TorusGeometry(r, tube, 6, 24, arc), mat);
+    const o = this.mesh(Kit.detail === 'hi' ? new THREE.TorusGeometry(r, tube, 6, 24, arc) : new THREE.TorusGeometry(r, tube, 4, 10, arc), mat);
     o.position.set(x, y, z); o.rotation.set(rx, ry, 0);
     return o;
   }
 }
+
+/** Cylinder sides at the current detail: far away, 6 is round enough. */
+const lod = (seg: number) => (Kit.detail === 'hi' ? seg : Math.min(seg, 6));
 
 const _n = new THREE.Vector3();
 

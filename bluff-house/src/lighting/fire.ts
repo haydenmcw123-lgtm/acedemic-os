@@ -18,7 +18,7 @@ export class Fire {
   constructor(boxes: { x: number; y: number; z: number; width: number }[]) {
     this.group.name = 'fire';
     this.flameMat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true, // additive: face order does not matter
       uniforms: { time: { value: 0 } },
       vertexShader: /* glsl */ `
         varying vec2 vUv; varying float vSeed;
@@ -66,6 +66,6 @@ export class Fire {
     this.t += dt;
     this.flameMat.uniforms.time.value = this.t;
     const f = 0.75 + 0.15 * Math.sin(this.t * 13.1) + 0.1 * Math.sin(this.t * 7.3 + 1.7) + 0.08 * Math.sin(this.t * 23.0);
-    for (const l of this.lights) l.intensity = 9 * f;
+    for (let i = 0; i < this.lights.length; i++) this.lights[i].intensity = 9 * f;
   }
 }

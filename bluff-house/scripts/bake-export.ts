@@ -78,7 +78,9 @@ function add(mesh: THREE.Mesh, role: 'receiver' | 'occluder', filter?: (cx: numb
 }
 
 for (const [key, group] of built.groups) {
-  for (const o of group.children) {
+  // furniture sits in a 'furniture:hi' / 'furniture:lo' pair per group: the bake uses the full-detail set
+  const kids = group.children.flatMap((o) => (o.name === 'furniture:hi' ? o.children : o.name === 'furniture:lo' ? [] : [o]));
+  for (const o of kids) {
     const m = o as THREE.Mesh;
     if (!m.isMesh || (m as unknown as THREE.InstancedMesh).isInstancedMesh) continue;
     if (m.name.startsWith('furniture:')) { if (m.name.endsWith(':builtin')) add(m, 'occluder'); continue; }

@@ -55,11 +55,21 @@ export class Post {
   private grade: EffectPass;
   private aa: EffectPass;
   settings: PostSettings = POST_PRESETS.high;
+  /** Draw calls of the last main scene pass (without the mirror pass, AO and post). */
+  sceneCalls = 0;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, toneMap: ToneMap = 'agx') {
     renderer.toneMapping = THREE.NoToneMapping; // the composer tone maps
     this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
-    this.composer.addPass(new RenderPass(scene, camera));
+    const scenePass = new RenderPass(scene, camera);
+    // count the main scene pass's draw calls on their own (the perf report's budget figure)
+    const draw = scenePass.render.bind(scenePass);
+    scenePass.render = (...args: Parameters<RenderPass['render']>) => {
+      const info = renderer.info.render, c0 = info.calls;
+      draw(...args);
+      this.sceneCalls = renderer.info.autoReset ? info.calls : info.calls - c0;
+    };
+    this.composer.addPass(scenePass);
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     this.ao = new N8AOPostPass(scene, camera, size.x, size.y);
     Object.assign(this.ao.configuration, {
@@ -75,6 +85,11 @@ export class Post {
       gammaCorrection: false, // linear HDR in, tone mapping happens later
       color: new THREE.Color(0, 0, 0),
     });
+    // glass is the only transparency and N8AO's transparency-aware mode would cost two full-screen
+    // half-float buffers, a depth copy and a second render of every pane each frame (≈ 40 MB at 1080p),
+    // plus a whole-scene traversal per frame to auto-detect it: off
+    this.ao.autoDetectTransparency = false;
+    this.ao.configuration.transparencyAware = false;
     this.composer.addPass(this.ao);
     this.bloom = new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1.1, luminanceSmoothing: 0.25, intensity: 0.55, radius: 0.7 });
     this.tone = new ToneMappingEffect({ mode: toneMap === 'agx' ? ToneMappingMode.AGX : ToneMappingMode.ACES_FILMIC });

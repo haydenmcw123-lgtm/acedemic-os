@@ -30,7 +30,7 @@ export const VIEWS: [string, number, number, number, number, number][] = [
 ];
 export const HOURS: [string, number][] = [['noon', 12.5], ['golden', 17.75], ['night', 20.5]];
 
-const STAGE = 'stage5';
+const STAGE = 'stage6';
 const OUT = path.join(PROOF, STAGE, 'views');
 const BASE = path.join(ROOT, 'tests', 'baselines', STAGE);
 const UPDATE = !!process.env.UPDATE_BASELINES;

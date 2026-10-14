@@ -9,12 +9,15 @@
 | [n8ao](https://github.com/N8python/n8ao) | 2.0.1 | ISC | ambient occlusion |
 | [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh) | 0.9.16 | MIT | collision and sight-line queries |
 | [Inter](https://rsms.me/inter/) (Google Fonts) | — | SIL OFL 1.1 | UI type |
+| [Basis Universal](https://github.com/BinomialLLC/basis_universal) transcoder (shipped with three.js, copied to `public/basis/`) | three 0.186.1 | Apache-2.0 | turns the KTX2 textures into the GPU's compressed format, in a worker |
 
 ## Tools
 
 | Tool | Version | License | Used for |
 |---|---|---|---|
 | [Blender](https://www.blender.org) (Cycles) | 4.0.2 | GPL (tool only: the baked lightmaps are this project's output) | lightmap UVs and the GI bake (`scripts/bake.py`) |
+| [ktx2-encoder](https://github.com/gz65555/ktx2-encoder) (Basis Universal encoder, WebAssembly) | 0.6.0 | MIT (encoder: Apache-2.0) | `pnpm textures`: textures and lightmaps → KTX2 (dev only, not shipped) |
+| [pngjs](https://github.com/pngjs/pngjs) | 7.0.0 | MIT | reads the lightmap PNGs for `pnpm textures` (dev only) |
 
 ## Models and textures
 

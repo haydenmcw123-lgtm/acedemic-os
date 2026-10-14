@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { len2 } from '../util/noise';
 import type { TourStop } from '../data/types';
 
 const sstep = (a: number, b: number, v: number) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -60,19 +61,27 @@ export class Tour {
     this.dwellIdx = stops.map((st, i) => (st.dwellSec ? i : -1)).filter((i) => i >= 0);
   }
 
-  /** Point on the path at arc length s (binary search + lerp). */
-  at(s: number): { x: number; z: number; i: number } {
+  // reused results: the tour runs every frame and allocates nothing
+  private _p = { x: 0, z: 0, i: 0 }; private _a = { x: 0, z: 0, i: 0 }; private _b = { x: 0, z: 0, i: 0 };
+  private _pose: TourPose = { x: 0, z: 0, lookX: 0, lookZ: 0, lookY: null, lookWeight: 0, speed: 0, dwelling: false };
+
+  /** Point on the path at arc length s (binary search + lerp), written into `out`. */
+  at(s: number, out = { x: 0, z: 0, i: 0 }): { x: number; z: number; i: number } {
     const S = this.samples;
     s = Math.min(this.total, Math.max(0, s));
     let lo = 0, hi = S.length - 1;
     while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m].s < s) lo = m; else hi = m; }
     const a = S[lo], b = S[hi];
     const t = b.s > a.s ? (s - a.s) / (b.s - a.s) : 0;
-    return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, i: lo };
+    out.x = a.x + (b.x - a.x) * t; out.z = a.z + (b.z - a.z) * t; out.i = lo;
+    return out;
   }
 
-  private nextDwell(s: number) { for (const i of this.dwellIdx) if (this.stopS[i] > s + 1e-3) return i; return -1; }
-  private prevDwell(s: number) { let r = -1; for (const i of this.dwellIdx) if (this.stopS[i] <= s + 1e-3) r = i; return r; }
+  // A stop is still ahead until we are past it. (Leaving a dwell moves s 1e-3 beyond its stop, so the
+  // stop just held isn't found again. The old test, "more than 1e-3 ahead", skipped a stop whenever a
+  // step happened to land within 1e-3 short of it: stops 41 and 99, and the Front Entry at the start.)
+  private nextDwell(s: number) { const D = this.dwellIdx; for (let k = 0; k < D.length; k++) if (this.stopS[D[k]] > s - 1e-4) return D[k]; return -1; }
+  private prevDwell(s: number) { const D = this.dwellIdx; let r = -1; for (let k = 0; k < D.length; k++) if (this.stopS[D[k]] <= s + 1e-3) r = D[k]; return r; }
 
   /** Advances the tour by dt seconds and returns where the camera should be and look. */
   update(dt: number): TourPose {
@@ -98,20 +107,19 @@ export class Tour {
     return this.pose(speed);
   }
 
-  /** Camera target for the current arc position, without advancing. */
+  /** Camera target for the current arc position, without advancing (a reused object: read it, don't keep it). */
   pose(speed = 0): TourPose {
-    const p = this.at(this.s);
-    const ahead = this.at(this.s + TOUR.lead);
+    const p = this.at(this.s, this._p);
+    const ahead = this.at(this.s + TOUR.lead, this._a);
     let lookX = ahead.x, lookZ = ahead.z;
-    if (Math.hypot(lookX - p.x, lookZ - p.z) < 0.5) { // at the very end: keep the last heading
-      const back = this.at(this.s - TOUR.lead); lookX = p.x + (p.x - back.x); lookZ = p.z + (p.z - back.z);
+    if (len2(lookX - p.x, lookZ - p.z) < 0.5) { // at the very end: keep the last heading
+      const back = this.at(this.s - TOUR.lead, this._b); lookX = p.x + (p.x - back.x); lookZ = p.z + (p.z - back.z);
     }
     // blend toward the dwell stop's look-at target as we approach it, hold through the dwell, release after
     let lookWeight = 0, lookY: number | null = null;
     const nd = this.dwellStop >= 0 ? this.dwellStop : this.nextDwell(this.s);
     const pd = this.prevDwell(this.s);
-    const near = (i: number) => (i >= 0 ? 1 - sstep(0, TOUR.easeDist * 2, Math.abs(this.stopS[i] - this.s)) : 0);
-    const wN = this.dwellStop >= 0 ? 1 : near(nd), wP = near(pd);
+    const wN = this.dwellStop >= 0 ? 1 : this.near(nd), wP = this.near(pd);
     const pick = wN >= wP ? nd : pd;
     const w = Math.max(wN, wP);
     const st = pick >= 0 ? this.stops[pick] : null;
@@ -121,8 +129,11 @@ export class Tour {
       lookZ = lookZ + (st.lookAt[1] - lookZ) * w;
       lookY = st.lookAt[2];
     }
-    return { x: p.x, z: p.z, lookX, lookZ, lookY, lookWeight, speed, dwelling: this.dwell > 0 };
+    const o = this._pose;
+    o.x = p.x; o.z = p.z; o.lookX = lookX; o.lookZ = lookZ; o.lookY = lookY; o.lookWeight = lookWeight; o.speed = speed; o.dwelling = this.dwell > 0;
+    return o;
   }
+  private near(i: number) { return i >= 0 ? 1 - sstep(0, TOUR.easeDist * 2, Math.abs(this.stopS[i] - this.s)) : 0; }
 
   /** Arc length of the path point nearest (x, z), optionally limited to samples whose feet match. */
   nearest(x: number, z: number, accept?: (sampleIndex: number) => boolean): number {

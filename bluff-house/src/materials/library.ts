@@ -137,6 +137,40 @@ const SPECS: Record<string, Spec> = {
   ember: { color: 0x2a140a, rough: 0.9, emissive: 0xff5a14, glowDay: 2.5, env: 0.1 },
 };
 
+/**
+ * Plain (untextured, opaque, non-emissive, standard) finishes can share one "flat" material whose
+ * color, roughness and metalness ride on the vertices instead: furniture merges all of them into a
+ * single draw call per floor. Returns null for anything that needs its own material.
+ */
+export function flatParams(key: string): { color: THREE.Color; rough: number; metal: number } | null {
+  const s = SPECS[key];
+  if (!s || s.tex || s.emissive !== undefined || s.alphaTest || s.clearcoat || s.sheen || s.side !== undefined) return null;
+  return { color: new THREE.Color(s.color ?? 0xffffff), rough: Math.max(MIN_ROUGH, s.rough ?? 0.8), metal: s.metal ?? 0 };
+}
+
+/** The shared vertex-colored material for flat finishes (one per variant and pool). */
+export function flatMaterial(variant: Variant, pool: Pool): THREE.MeshStandardMaterial {
+  const ck = '@flat|' + variant + '|' + pool;
+  let m = cache.get(ck) as THREE.MeshStandardMaterial | undefined;
+  if (m) return m;
+  m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 1 });
+  m.name = '@flat|' + variant;
+  m.envMapIntensity = 0.8 * (variant === 'int' ? INTERIOR_ENV : 1);
+  m.userData.castShadow = true;
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 pbr;\nvarying vec2 vPbr;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPbr = pbr;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vPbr;')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vPbr.x;')
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vPbr.y;');
+  };
+  m.customProgramCacheKey = () => 'flat-pbr';
+  if (variant === 'int') INTERIOR_MATERIALS.push(m);
+  if (pool === 'loose') LOOSE_MATERIALS.push(m);
+  cache.set(ck, m);
+  return m;
+}
+
 const cache = new Map<string, THREE.Material>();
 /**
  * Materials in the "loose" pool belong only to movable furniture, so the Furnished toggle can fade
@@ -232,6 +266,9 @@ function glassMaterial(variant: Variant) {
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
   });
   m.envMapIntensity = variant === 'int' ? 1.0 : 1.2;
+  // one pass for both faces: three's default two-pass draw of double-sided transparency flips
+  // material.side (and bumps its version) twice per pane per frame, re-checking the shader each time
+  m.forceSinglePass = true;
   m.blending = THREE.CustomBlending;
   m.blendSrc = THREE.OneFactor;
   m.blendDst = THREE.OneMinusSrcAlphaFactor;

@@ -243,3 +243,5 @@ export function textureSet(key: string): TexSet | null {
   return t;
 }
 export const TEXTURE_KEYS = Object.keys(GENERATORS);
+/** A pre-baked set (KTX2, see prebuilt.ts) takes the place of the generator for its key. */
+export function registerTextureSet(key: string, t: TexSet) { if (GENERATORS[key]) cache.set(key, t); }

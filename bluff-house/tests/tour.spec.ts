@@ -62,3 +62,13 @@ test('Space hands the tour to free walk on the spot, R blends back onto the path
   expect(r.after.mode).toBe('tour');
   expect(Math.abs(r.after.feet - r.before.feet)).toBeLessThan(0.5);
 });
+
+test('the tour holds at every stop that has a dwell, for its full time', async ({ page }) => {
+  await openApp(page);
+  const held = await page.evaluate(() => window.__app.dwellSequence()) as [number, number][];
+  const stops = JSON.parse(fs.readFileSync(path.join(ROOT, 'house-data.json'), 'utf8')).tourStops as { dwellSec?: number }[];
+  const want = stops.flatMap((t, i) => (t.dwellSec ? [[i + 1, t.dwellSec]] : []));
+  // (a stop used to be skipped whenever a step landed within 1/1000 ft short of it: Stage 6 fix)
+  expect(held.map(([n]) => n)).toEqual(want.map(([n]) => n));
+  for (let i = 0; i < want.length; i++) expect(Math.abs(held[i][1] - want[i][1])).toBeLessThan(0.1);
+});

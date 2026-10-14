@@ -4,11 +4,15 @@ import type { DynamicBlocker } from '../build/context';
 import type { GroupKey } from '../build/geom';
 import { FLOOR_Y } from '../data/house';
 import type { HouseData } from '../data/types';
-import { INTERIOR_MATERIALS, LOOSE_MATERIALS, material } from '../materials/library';
+import { flatMaterial, flatParams, INTERIOR_MATERIALS, LOOSE_MATERIALS, material } from '../materials/library';
 import { CATALOG, RUG_LABELS, RUG_PATTERNS, UPHOLSTERY_FINISHES, UPHOLSTERY_LABELS, type Staging } from './catalog';
-import { bakeMesh, type Prop } from './kit';
+import { bakeMesh, Kit, type Prop } from './kit';
 
 /** One placed piece of furniture, in world space. */
+interface Bucket { group: GroupKey; mat: string; cast: boolean; loose: boolean; lo: boolean; parts: THREE.BufferGeometry[]; mesh: THREE.Mesh | null }
+/** Furniture LOD distance (ft from a floor's furniture bounds). */
+const LOD_FAR = 50;
+
 export interface PlacedItem {
   id: number;
   room: string;
@@ -21,6 +25,8 @@ export interface PlacedItem {
   staging: Staging;
   roles: Record<string, string>;
   parts: { geo: THREE.BufferGeometry; mat: string; cast: boolean }[];
+  /** The same pieces at low detail, drawn when the item's floor is seen from far away (LOD). */
+  lo: { geo: THREE.BufferGeometry; mat: string; cast: boolean }[];
   /** Oriented footprint (center, half extents, rotation about y) and height range, in world feet. */
   obb: { cx: number; cz: number; hw: number; hd: number; rot: number; y0: number; y1: number };
   blocker: DynamicBlocker | null;
@@ -54,7 +60,10 @@ export class Furniture {
   furnished = true;
   private fade = 1;
   private target = 1;
-  private buckets = new Map<string, { group: GroupKey; mat: string; cast: boolean; loose: boolean; parts: THREE.BufferGeometry[]; mesh: THREE.Mesh | null }>();
+  private buckets = new Map<string, Bucket>();
+  /** Per group: the hi and lo detail sets, the furniture's bounds, and which one is showing. */
+  private lods: { hi: THREE.Group; lo: THREE.Group; box: THREE.Box3; far: boolean }[] = [];
+  private lodByGroup = new Map<GroupKey, Furniture['lods'][number]>();
   /** Set when shadows need one re-render (items appeared, vanished or changed). */
   shadowsDirty = false;
 
@@ -69,7 +78,8 @@ export class Furniture {
         const level = room === 'exterior' ? -1 : levelOf.get(room) ?? 1;
         const group: GroupKey = level < 0 ? 'site' : (`L${level}i` as GroupKey);
         const size = it.size as [number, number, number];
-        const kit = entry.build(size, seed++);
+        const sd = seed++;
+        const kit = entry.build(size, sd);
 
         // local bounds of the model as built
         kit.g.updateMatrixWorld(true);
@@ -93,6 +103,12 @@ export class Furniture {
         for (const o of kit.g.children as THREE.Mesh[]) {
           parts.push({ geo: bakeMesh(o, o.matrixWorld, _m), mat: o.userData.mat, cast: o.userData.cast });
         }
+        // the far-away twin: same builder, same seed, low detail, fitted with the same transform
+        Kit.detail = 'lo';
+        const lk = entry.build(size, sd);
+        Kit.detail = 'hi';
+        lk.g.updateMatrixWorld(true);
+        const lo: PlacedItem['lo'] = (lk.g.children as THREE.Mesh[]).map((o) => ({ geo: bakeMesh(o, o.matrixWorld, _m), mat: o.userData.mat, cast: o.userData.cast }));
         for (const p of kit.props) {
           const pm = new THREE.Matrix4();
           if (p.kind === 'book') pm.compose(_v.set(p.x, p.y + p.h / 2, p.z), _q.identity(), _s.set(p.w, p.h, p.d));
@@ -103,7 +119,7 @@ export class Furniture {
 
         const item: PlacedItem = {
           id: id++, room, name: it.name, builtIn: !!it.builtIn, group, level,
-          x: it.x, z: it.z, y: baseY, rot, size, staging: entry.staging ?? null, roles, parts, stretch,
+          x: it.x, z: it.z, y: baseY, rot, size, staging: entry.staging ?? null, roles, parts, lo, stretch,
           obb: { cx: it.x, cz: it.z, hw: size[0] / 2, hd: size[2] / 2, rot, y0: baseY, y1: baseY + size[1] },
           blocker: null,
         };
@@ -111,6 +127,10 @@ export class Furniture {
         if (item.blocker) this.blockers.push(item.blocker);
         this.items.push(item);
         for (const p of parts) this.addPart(item, p);
+        for (const p of lo) this.addPart(item, p, true);
+        const l = this.lod(group);
+        const rr = Math.max(size[0], size[2]) / 2; // any rotation
+        l.box.expandByPoint(_v.set(it.x - rr, baseY, it.z - rr)).expandByPoint(_v.set(it.x + rr, baseY + size[1], it.z + rr));
       }
     }
     for (const b of this.buckets.values()) this.rebuild(b);
@@ -130,31 +150,71 @@ export class Furniture {
 
   private resolve(it: PlacedItem, mat: string) { return mat.startsWith('@') ? it.roles[mat] ?? 'white' : mat; }
 
-  private bucketKey(it: PlacedItem, mat: string, cast: boolean) { return `${it.group}|${mat}|${cast ? 1 : 0}|${it.builtIn ? 'b' : 'l'}`; }
+  private bucketKey(it: PlacedItem, mat: string, cast: boolean, lo = false) { return `${it.group}|${mat}|${cast ? 1 : 0}|${it.builtIn ? 'b' : 'l'}${lo ? '|lo' : ''}`; }
 
-  private addPart(it: PlacedItem, p: PlacedItem['parts'][number]) {
-    const mat = this.resolve(it, p.mat), k = this.bucketKey(it, mat, p.cast);
+  /** The hi / lo detail groups for a level group (created on first use). */
+  private lod(g: GroupKey) {
+    let l = this.lodByGroup.get(g);
+    if (!l) {
+      const hi = new THREE.Group(), lo = new THREE.Group();
+      hi.name = 'furniture:hi'; lo.name = 'furniture:lo'; lo.visible = false;
+      this.groups.get(g)!.add(hi, lo);
+      l = { hi, lo, box: new THREE.Box3(), far: false };
+      this.lodByGroup.set(g, l); this.lods.push(l);
+    }
+    return l;
+  }
+
+  /**
+   * Furniture LOD: each floor's furniture shows its low-detail twin while the camera is more than
+   * ~50 ft from that floor's furniture (the lawn, the dock, the water), with 8 ft of hysteresis.
+   * Same buckets either way, so the draw-call count does not change; only the triangles do.
+   */
+  updateLod(cam: THREE.Vector3) {
+    for (let i = 0; i < this.lods.length; i++) {
+      const l = this.lods[i], d = l.box.distanceToPoint(cam);
+      const far = l.far ? d > LOD_FAR - 8 : d > LOD_FAR;
+      if (far === l.far) continue;
+      l.far = far; l.hi.visible = !far; l.lo.visible = far;
+      this.shadowsDirty = true;
+    }
+  }
+
+  private addPart(it: PlacedItem, p: PlacedItem['parts'][number], lo = false) {
+    let mat = this.resolve(it, p.mat);
+    // plain finishes share one vertex-colored material per floor (roles stay separate: staging swaps them)
+    const flat = p.mat.startsWith('@') ? null : flatParams(mat);
+    if (flat) {
+      if (!p.geo.attributes.pbr) {
+        const n = p.geo.attributes.position.count, col = new Float32Array(n * 3), pbr = new Float32Array(n * 2);
+        for (let i = 0; i < n; i++) { col[i * 3] = flat.color.r; col[i * 3 + 1] = flat.color.g; col[i * 3 + 2] = flat.color.b; pbr[i * 2] = flat.rough; pbr[i * 2 + 1] = flat.metal; }
+        p.geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        p.geo.setAttribute('pbr', new THREE.BufferAttribute(pbr, 2));
+      }
+      mat = '@flat';
+    }
+    const k = this.bucketKey(it, mat, p.cast, lo);
     let b = this.buckets.get(k);
-    if (!b) { b = { group: it.group, mat, cast: p.cast, loose: !it.builtIn, parts: [], mesh: null }; this.buckets.set(k, b); }
+    if (!b) { b = { group: it.group, mat, cast: p.cast, loose: !it.builtIn, lo, parts: [], mesh: null }; this.buckets.set(k, b); }
     b.parts.push(p.geo);
     return b;
   }
 
-  private rebuild(b: { group: GroupKey; mat: string; cast: boolean; loose: boolean; parts: THREE.BufferGeometry[]; mesh: THREE.Mesh | null }) {
+  private rebuild(b: Bucket) {
     if (b.mesh) { b.mesh.geometry.dispose(); b.mesh.parent?.remove(b.mesh); const i = this.looseMeshes.indexOf(b.mesh); if (i >= 0) this.looseMeshes.splice(i, 1); b.mesh = null; }
     if (!b.parts.length) return;
     const geo = mergeGeometries(b.parts, false)!;
     geo.computeBoundingSphere();
     const variant = b.group === 'site' ? 'ext' : 'int';
-    const mat = material(b.mat, variant, b.loose ? 'loose' : 'arch');
+    const mat = b.mat === '@flat' ? flatMaterial(variant, b.loose ? 'loose' : 'arch') : material(b.mat, variant, b.loose ? 'loose' : 'arch');
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = `furniture:${b.group}:${b.mat}${b.loose ? '' : ':builtin'}`;
+    mesh.name = `furniture:${b.group}:${b.mat}${b.loose ? '' : ':builtin'}${b.lo ? ':lo' : ''}`;
     mesh.castShadow = b.cast && mat.userData.castShadow !== false;
     mesh.receiveShadow = true;
     if (mat.userData.depthMat) mesh.customDepthMaterial = mat.userData.depthMat;
     mesh.userData.furniture = true;
     mesh.visible = !b.loose || this.fade > 0;
-    this.groups.get(b.group)!.add(mesh);
+    (b.lo ? this.lod(b.group).lo : this.lod(b.group).hi).add(mesh);
     if (b.loose) this.looseMeshes.push(mesh);
     b.mesh = mesh;
   }
@@ -236,9 +296,9 @@ export class Furniture {
     const next = list[(list.indexOf(cur) + 1) % list.length];
     // move this item's parts between merged buckets and rebuild just those
     const touched = new Set<ReturnType<Furniture['addPart']>>();
-    for (const p of it.parts) {
+    for (const [ps, lo] of [[it.parts, false], [it.lo, true]] as const) for (const p of ps) {
       if (p.mat !== role) continue;
-      const old = this.buckets.get(this.bucketKey(it, this.resolve(it, p.mat), p.cast))!;
+      const old = this.buckets.get(this.bucketKey(it, this.resolve(it, p.mat), p.cast, lo))!;
       old.parts.splice(old.parts.indexOf(p.geo), 1); touched.add(old);
     }
     it.roles[role] = next;
@@ -248,7 +308,10 @@ export class Furniture {
       it.model.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { const s = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3()); const a = s.x * s.z + s.y * (s.x + s.z); if (a > area) { area = a; big = m; } } });
       const f = material(next, it.group === 'site' ? 'ext' : 'int') as THREE.MeshStandardMaterial, bm = big as THREE.Mesh | null;
       if (bm) { const m = bm.material as THREE.MeshStandardMaterial; m.color.copy(f.color); m.map = f.map; m.needsUpdate = true; }
-    } else for (const p of it.parts) if (p.mat === role) touched.add(this.addPart(it, p));
+    } else {
+      for (const p of it.parts) if (p.mat === role) touched.add(this.addPart(it, p));
+      for (const p of it.lo) if (p.mat === role) touched.add(this.addPart(it, p, true));
+    }
     for (const b of touched) this.rebuild(b);
     this.shadowsDirty = true;
     return it.staging === 'rug' ? RUG_LABELS[next] : UPHOLSTERY_LABELS[next];
@@ -280,8 +343,8 @@ export class Furniture {
     const touched = new Set<ReturnType<Furniture['addPart']>>();
     for (const it of this.items) {
       if (CATALOG[it.name]?.glb !== file || it.model) continue;
-      for (const p of it.parts) {
-        const b = this.buckets.get(this.bucketKey(it, this.resolve(it, p.mat), p.cast));
+      for (const [ps, lo] of [[it.parts, false], [it.lo, true]] as const) for (const p of ps) {
+        const b = this.buckets.get(this.bucketKey(it, p.geo.attributes.pbr ? '@flat' : this.resolve(it, p.mat), p.cast, lo));
         if (b) { b.parts.splice(b.parts.indexOf(p.geo), 1); touched.add(b); }
       }
       const obj = model.clone(true);
@@ -315,8 +378,8 @@ export class Furniture {
   }
 
   stats() {
-    let tris = 0, meshes = 0;
-    for (const b of this.buckets.values()) if (b.mesh) { tris += b.mesh.geometry.attributes.position.count / 3; meshes++; }
-    return { items: this.items.length, meshes, tris, blockers: this.blockers.length };
+    let tris = 0, meshes = 0, loTris = 0;
+    for (const b of this.buckets.values()) if (b.mesh) { const t = b.mesh.geometry.attributes.position.count / 3; if (b.lo) loTris += t; else { tris += t; meshes++; } }
+    return { items: this.items.length, meshes, tris, loTris, blockers: this.blockers.length, far: [...this.lodByGroup].filter(([, l]) => l.far).map(([g]) => g) };
   }
 }

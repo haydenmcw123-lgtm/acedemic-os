@@ -61,8 +61,11 @@ export class Input {
     this.move.sprint = k.has('ShiftLeft') || k.has('ShiftRight');
   }
 
+  private look: [number, number] = [0, 0];
+  /** The mouse look since the last call (a reused tuple: read it, don't keep it). */
   consumeLook(): [number, number] {
-    const d: [number, number] = [this.lookDX, this.lookDY];
+    const d = this.look;
+    d[0] = this.lookDX; d[1] = this.lookDY;
     this.lookDX = this.lookDY = 0;
     return d;
   }

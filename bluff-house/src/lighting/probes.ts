@@ -18,7 +18,10 @@ import { INTERIOR_MATERIALS } from '../materials/library';
  */
 interface Probe { id: string; rooms: string[]; pos: THREE.Vector3; min: THREE.Vector3; max: THREE.Vector3; tex: THREE.Texture | null; stale: boolean }
 
-const SIZE = 256; // same as the stand-in PMREM, so switching never recompiles shaders
+/** Cube face size. 128 is plenty for room reflections (glossy, box-projected) and a quarter of 256's
+ * GPU memory; it matches the stand-in's size, so switching never recompiles shaders. */
+export const PROBE_SIZE = 128;
+const SIZE = PROBE_SIZE;
 
 /** Shared uniforms: every interior material reads the same box. */
 export const PROBE_UNIFORMS = {

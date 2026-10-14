@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { len2 } from '../util/noise';
 import { PLAYER, type MoveInput, type PlayerController } from './controller';
 import { Tour, TOUR } from './tour';
 
@@ -81,7 +82,7 @@ export class Director {
       pl.pitch = THREE.MathUtils.clamp(pl.pitch - look[1] * 0.0022, -1.35, 1.35);
       const before = pl.walked;
       pl.step(dt, input);
-      const v = Math.hypot(pl.vx, pl.vz);
+      const v = len2(pl.vx, pl.vz);
       this.bob(pl.walked - before, v / PLAYER.walkSpeed, dt);
       return;
     }
@@ -100,14 +101,14 @@ export class Director {
     let tPitch = -0.03;
     if (pose.lookY !== null) {
       const eye = pl.camFeet + PLAYER.eye, ty = pl.feet + pose.lookY;
-      tPitch = THREE.MathUtils.lerp(-0.03, Math.atan2(ty - eye, Math.hypot(dx, dz)), pose.lookWeight);
+      tPitch = THREE.MathUtils.lerp(-0.03, Math.atan2(ty - eye, len2(dx, dz)), pose.lookWeight);
     }
     const tdt = dt * this.tour.mult;
     const k = 1 - Math.exp(-TOUR.lookRate * tdt);
     const cap = TOUR.maxTurn * tdt;
     pl.yaw += THREE.MathUtils.clamp(wrap(tYaw - pl.yaw) * k, -cap, cap);
     pl.pitch += THREE.MathUtils.clamp((tPitch - pl.pitch) * k, -cap, cap);
-    this.bob(Math.hypot(pl.x - px, pl.z - pz), pose.speed / TOUR.speed, dt);
+    this.bob(len2(pl.x - px, pl.z - pz), pose.speed / TOUR.speed, dt);
 
     if (this.blendT > 0) {
       this.blendT = Math.max(0, this.blendT - dt);

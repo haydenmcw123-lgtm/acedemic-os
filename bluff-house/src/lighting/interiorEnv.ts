@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PROBE_SIZE } from './probes';
 import { INTERIOR_MATERIALS } from '../materials/library';
 
 /**
@@ -56,7 +57,7 @@ export class InteriorEnv {
     this.window.color.copy(sky).multiplyScalar(2.2 * daylight + 0.004);
     this.sunPatch.color.copy(sunColor).multiplyScalar(1.2 * direct);
     this.lamps.color.copy(lamp).multiplyScalar(6 * lamps);
-    const rt = this.pmrem.fromScene(this.scene, 0, 0.1, 100);
+    const rt = this.pmrem.fromScene(this.scene, 0, 0.1, 100, { size: PROBE_SIZE }); // same size as the room probes: no shader recompiles when they swap
     this.rt?.dispose();
     this.rt = rt;
     this.texture = rt.texture;

@@ -1,0 +1,146 @@
+{
+  "heavy": [
+    {
+      "t": 1920,
+      "from": 0,
+      "to": 1,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 3840,
+      "from": 1,
+      "to": 2,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 5760,
+      "from": 2,
+      "to": 3,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 7680,
+      "from": 3,
+      "to": 4,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 9600,
+      "from": 4,
+      "to": 5,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 11520,
+      "from": 5,
+      "to": 6,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 13440,
+      "from": 6,
+      "to": 7,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    }
+  ],
+  "probeThenLock": [
+    {
+      "t": 1920,
+      "from": 0,
+      "to": 1,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 3840,
+      "from": 1,
+      "to": 2,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 5760,
+      "from": 2,
+      "to": 3,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 7680,
+      "from": 3,
+      "to": 4,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 9600,
+      "from": 4,
+      "to": 5,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 11520,
+      "from": 5,
+      "to": 6,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 13440,
+      "from": 6,
+      "to": 7,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 90578,
+      "from": 7,
+      "to": 6,
+      "avg": 8,
+      "why": "avg < 12 ms for 10 s"
+    },
+    {
+      "t": 100578,
+      "from": 6,
+      "to": 5,
+      "avg": 8,
+      "why": "avg < 12 ms for 10 s"
+    },
+    {
+      "t": 110434,
+      "from": 0,
+      "to": 1,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 112354,
+      "from": 1,
+      "to": 2,
+      "avg": 30,
+      "why": "avg > 20 ms"
+    },
+    {
+      "t": 122627,
+      "from": 2,
+      "to": 1,
+      "avg": 16.7,
+      "why": "vsync-locked for 10 s (probe)"
+    },
+    {
+      "t": 124536,
+      "from": 1,
+      "to": 2,
+      "avg": 20.3,
+      "why": "avg > 20 ms"
+    }
+  ]
+}

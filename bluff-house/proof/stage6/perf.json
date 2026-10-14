@@ -1,0 +1,739 @@
+{
+  "lod": {
+    "kitchen": {
+      "furnitureFar": [
+        "site"
+      ],
+      "furnitureTris": 180740,
+      "furnitureLoTris": 28992,
+      "treesFull": 31,
+      "treesLite": 229
+    },
+    "water": {
+      "furnitureFar": [
+        "L1i",
+        "L2i",
+        "L0i",
+        "site"
+      ],
+      "furnitureTris": 180740,
+      "furnitureLoTris": 28992,
+      "treesFull": 8,
+      "treesLite": 252
+    }
+  },
+  "tour": {
+    "high": {
+      "tourSeconds": 395,
+      "stops": [
+        {
+          "stop": 1,
+          "label": "Front Entry",
+          "inside": false,
+          "calls": 494,
+          "sceneCalls": 232,
+          "mirrorCalls": 35,
+          "tris": 890065,
+          "ms": 15
+        },
+        {
+          "stop": 4,
+          "label": "Entry Foyer",
+          "inside": true,
+          "calls": 284,
+          "sceneCalls": 222,
+          "mirrorCalls": 35,
+          "tris": 629139,
+          "ms": 8
+        },
+        {
+          "stop": 8,
+          "label": "Great Room",
+          "inside": true,
+          "calls": 222,
+          "sceneCalls": 160,
+          "mirrorCalls": 35,
+          "tris": 557363,
+          "ms": 13
+        },
+        {
+          "stop": 9,
+          "label": "Great Room",
+          "inside": true,
+          "calls": 210,
+          "sceneCalls": 152,
+          "mirrorCalls": 31,
+          "tris": 541485,
+          "ms": 29
+        },
+        {
+          "stop": 13,
+          "label": "Primary Bedroom",
+          "inside": true,
+          "calls": 172,
+          "sceneCalls": 113,
+          "mirrorCalls": 32,
+          "tris": 499937,
+          "ms": 4521
+        },
+        {
+          "stop": 16,
+          "label": "Primary Deck",
+          "inside": false,
+          "calls": 140,
+          "sceneCalls": 81,
+          "mirrorCalls": 32,
+          "tris": 447373,
+          "ms": 4654
+        },
+        {
+          "stop": 22,
+          "label": "His Closet",
+          "inside": true,
+          "calls": 246,
+          "sceneCalls": 186,
+          "mirrorCalls": 33,
+          "tris": 625163,
+          "ms": 6746
+        },
+        {
+          "stop": 25,
+          "label": "Primary Bath",
+          "inside": true,
+          "calls": 156,
+          "sceneCalls": 109,
+          "mirrorCalls": 20,
+          "tris": 544641,
+          "ms": 129
+        },
+        {
+          "stop": 28,
+          "label": "Her Closet",
+          "inside": true,
+          "calls": 237,
+          "sceneCalls": 177,
+          "mirrorCalls": 33,
+          "tris": 623265,
+          "ms": 2792
+        },
+        {
+          "stop": 41,
+          "label": "Covered Deck",
+          "inside": false,
+          "calls": 146,
+          "sceneCalls": 88,
+          "mirrorCalls": 31,
+          "tris": 457395,
+          "ms": 3358
+        },
+        {
+          "stop": 42,
+          "label": "Covered Deck",
+          "inside": false,
+          "calls": 233,
+          "sceneCalls": 181,
+          "mirrorCalls": 25,
+          "tris": 584299,
+          "ms": 679
+        },
+        {
+          "stop": 45,
+          "label": "Dining Room",
+          "inside": true,
+          "calls": 159,
+          "sceneCalls": 98,
+          "mirrorCalls": 34,
+          "tris": 475809,
+          "ms": 1016
+        },
+        {
+          "stop": 48,
+          "label": "Wine Room",
+          "inside": true,
+          "calls": 193,
+          "sceneCalls": 141,
+          "mirrorCalls": 25,
+          "tris": 554411,
+          "ms": 279
+        },
+        {
+          "stop": 53,
+          "label": "Powder Room",
+          "inside": true,
+          "calls": 199,
+          "sceneCalls": 139,
+          "mirrorCalls": 33,
+          "tris": 553057,
+          "ms": 8975
+        },
+        {
+          "stop": 58,
+          "label": "Kitchen",
+          "inside": true,
+          "calls": 191,
+          "sceneCalls": 142,
+          "mirrorCalls": 22,
+          "tris": 562707,
+          "ms": 4014
+        },
+        {
+          "stop": 61,
+          "label": "Butler's Pantry",
+          "inside": true,
+          "calls": 155,
+          "sceneCalls": 96,
+          "mirrorCalls": 32,
+          "tris": 503313,
+          "ms": 495
+        },
+        {
+          "stop": 68,
+          "label": "Mudroom & Laundry",
+          "inside": true,
+          "calls": 136,
+          "sceneCalls": 83,
+          "mirrorCalls": 26,
+          "tris": 445329,
+          "ms": 914
+        },
+        {
+          "stop": 71,
+          "label": "Garage",
+          "inside": true,
+          "calls": 134,
+          "sceneCalls": 86,
+          "mirrorCalls": 21,
+          "tris": 464651,
+          "ms": 320
+        },
+        {
+          "stop": 91,
+          "label": "Loft",
+          "inside": true,
+          "calls": 384,
+          "sceneCalls": 162,
+          "mirrorCalls": 35,
+          "tris": 827461,
+          "ms": 11583
+        },
+        {
+          "stop": 96,
+          "label": "Bedroom 4 Suite",
+          "inside": true,
+          "calls": 156,
+          "sceneCalls": 108,
+          "mirrorCalls": 21,
+          "tris": 495861,
+          "ms": 5628
+        },
+        {
+          "stop": 99,
+          "label": "Bedroom 4 Bath",
+          "inside": true,
+          "calls": 173,
+          "sceneCalls": 111,
+          "mirrorCalls": 35,
+          "tris": 538221,
+          "ms": 4889
+        },
+        {
+          "stop": 113,
+          "label": "Study",
+          "inside": true,
+          "calls": 156,
+          "sceneCalls": 97,
+          "mirrorCalls": 32,
+          "tris": 480583,
+          "ms": 796
+        },
+        {
+          "stop": 120,
+          "label": "Bedroom 2",
+          "inside": true,
+          "calls": 201,
+          "sceneCalls": 140,
+          "mirrorCalls": 34,
+          "tris": 527423,
+          "ms": 902
+        },
+        {
+          "stop": 123,
+          "label": "Jack & Jill Bath",
+          "inside": true,
+          "calls": 139,
+          "sceneCalls": 92,
+          "mirrorCalls": 20,
+          "tris": 493687,
+          "ms": 3922
+        },
+        {
+          "stop": 126,
+          "label": "Bedroom 3",
+          "inside": true,
+          "calls": 297,
+          "sceneCalls": 90,
+          "mirrorCalls": 20,
+          "tris": 708983,
+          "ms": 875
+        },
+        {
+          "stop": 153,
+          "label": "Game & Media Room",
+          "inside": true,
+          "calls": 375,
+          "sceneCalls": 160,
+          "mirrorCalls": 35,
+          "tris": 755203,
+          "ms": 4334
+        },
+        {
+          "stop": 156,
+          "label": "Golf Simulator",
+          "inside": true,
+          "calls": 157,
+          "sceneCalls": 98,
+          "mirrorCalls": 32,
+          "tris": 507377,
+          "ms": 7307
+        },
+        {
+          "stop": 159,
+          "label": "Game & Media Room",
+          "inside": true,
+          "calls": 173,
+          "sceneCalls": 111,
+          "mirrorCalls": 35,
+          "tris": 487361,
+          "ms": 1151
+        },
+        {
+          "stop": 163,
+          "label": "Lower Bath",
+          "inside": true,
+          "calls": 129,
+          "sceneCalls": 80,
+          "mirrorCalls": 22,
+          "tris": 454959,
+          "ms": 493
+        },
+        {
+          "stop": 167,
+          "label": "Bedroom 5",
+          "inside": true,
+          "calls": 160,
+          "sceneCalls": 98,
+          "mirrorCalls": 35,
+          "tris": 483361,
+          "ms": 1987
+        },
+        {
+          "stop": 173,
+          "label": "Home Gym",
+          "inside": true,
+          "calls": 179,
+          "sceneCalls": 117,
+          "mirrorCalls": 35,
+          "tris": 493579,
+          "ms": 740
+        },
+        {
+          "stop": 185,
+          "label": "Pool Terrace",
+          "inside": false,
+          "calls": 114,
+          "sceneCalls": 54,
+          "mirrorCalls": 33,
+          "tris": 415701,
+          "ms": 2409
+        },
+        {
+          "stop": 198,
+          "label": "Boat Dock",
+          "inside": false,
+          "calls": 94,
+          "sceneCalls": 35,
+          "mirrorCalls": 32,
+          "tris": 395497,
+          "ms": 3555
+        }
+      ],
+      "travelSamples": 91,
+      "inside": {
+        "maxSceneCalls": 223,
+        "maxFrameCalls": 423
+      },
+      "outside": {
+        "maxSceneCalls": 232,
+        "maxFrameCalls": 494
+      },
+      "maxTris": 890065,
+      "softwareMs": {
+        "avg": 2713,
+        "p95": 7307,
+        "p99": 8975
+      }
+    },
+    "medium": {
+      "tourSeconds": 395,
+      "stops": [
+        {
+          "stop": 1,
+          "label": "Front Entry",
+          "inside": false,
+          "calls": 494,
+          "sceneCalls": 232,
+          "mirrorCalls": 35,
+          "tris": 887167,
+          "ms": 12
+        },
+        {
+          "stop": 4,
+          "label": "Entry Foyer",
+          "inside": true,
+          "calls": 284,
+          "sceneCalls": 222,
+          "mirrorCalls": 35,
+          "tris": 627683,
+          "ms": 8
+        },
+        {
+          "stop": 8,
+          "label": "Great Room",
+          "inside": true,
+          "calls": 222,
+          "sceneCalls": 160,
+          "mirrorCalls": 35,
+          "tris": 556999,
+          "ms": 7
+        },
+        {
+          "stop": 9,
+          "label": "Great Room",
+          "inside": true,
+          "calls": 210,
+          "sceneCalls": 152,
+          "mirrorCalls": 31,
+          "tris": 541121,
+          "ms": 4
+        },
+        {
+          "stop": 13,
+          "label": "Primary Bedroom",
+          "inside": true,
+          "calls": 172,
+          "sceneCalls": 113,
+          "mirrorCalls": 32,
+          "tris": 499937,
+          "ms": 5
+        },
+        {
+          "stop": 16,
+          "label": "Primary Deck",
+          "inside": false,
+          "calls": 140,
+          "sceneCalls": 81,
+          "mirrorCalls": 32,
+          "tris": 447373,
+          "ms": 3
+        },
+        {
+          "stop": 22,
+          "label": "His Closet",
+          "inside": true,
+          "calls": 246,
+          "sceneCalls": 186,
+          "mirrorCalls": 33,
+          "tris": 625163,
+          "ms": 6
+        },
+        {
+          "stop": 25,
+          "label": "Primary Bath",
+          "inside": true,
+          "calls": 156,
+          "sceneCalls": 109,
+          "mirrorCalls": 20,
+          "tris": 544641,
+          "ms": 1888
+        },
+        {
+          "stop": 28,
+          "label": "Her Closet",
+          "inside": true,
+          "calls": 237,
+          "sceneCalls": 177,
+          "mirrorCalls": 33,
+          "tris": 623265,
+          "ms": 6063
+        },
+        {
+          "stop": 41,
+          "label": "Covered Deck",
+          "inside": false,
+          "calls": 146,
+          "sceneCalls": 88,
+          "mirrorCalls": 31,
+          "tris": 457395,
+          "ms": 1022
+        },
+        {
+          "stop": 42,
+          "label": "Covered Deck",
+          "inside": false,
+          "calls": 233,
+          "sceneCalls": 181,
+          "mirrorCalls": 25,
+          "tris": 584299,
+          "ms": 3650
+        },
+        {
+          "stop": 45,
+          "label": "Dining Room",
+          "inside": true,
+          "calls": 159,
+          "sceneCalls": 98,
+          "mirrorCalls": 34,
+          "tris": 475809,
+          "ms": 975
+        },
+        {
+          "stop": 48,
+          "label": "Wine Room",
+          "inside": true,
+          "calls": 193,
+          "sceneCalls": 141,
+          "mirrorCalls": 25,
+          "tris": 554411,
+          "ms": 265
+        },
+        {
+          "stop": 53,
+          "label": "Powder Room",
+          "inside": true,
+          "calls": 199,
+          "sceneCalls": 139,
+          "mirrorCalls": 33,
+          "tris": 553057,
+          "ms": 9380
+        },
+        {
+          "stop": 58,
+          "label": "Kitchen",
+          "inside": true,
+          "calls": 191,
+          "sceneCalls": 142,
+          "mirrorCalls": 22,
+          "tris": 562707,
+          "ms": 4034
+        },
+        {
+          "stop": 61,
+          "label": "Butler's Pantry",
+          "inside": true,
+          "calls": 155,
+          "sceneCalls": 96,
+          "mirrorCalls": 32,
+          "tris": 503313,
+          "ms": 529
+        },
+        {
+          "stop": 68,
+          "label": "Mudroom & Laundry",
+          "inside": true,
+          "calls": 136,
+          "sceneCalls": 83,
+          "mirrorCalls": 26,
+          "tris": 445329,
+          "ms": 930
+        },
+        {
+          "stop": 71,
+          "label": "Garage",
+          "inside": true,
+          "calls": 134,
+          "sceneCalls": 86,
+          "mirrorCalls": 21,
+          "tris": 464651,
+          "ms": 301
+        },
+        {
+          "stop": 91,
+          "label": "Loft",
+          "inside": true,
+          "calls": 384,
+          "sceneCalls": 162,
+          "mirrorCalls": 35,
+          "tris": 827461,
+          "ms": 11532
+        },
+        {
+          "stop": 96,
+          "label": "Bedroom 4 Suite",
+          "inside": true,
+          "calls": 156,
+          "sceneCalls": 108,
+          "mirrorCalls": 21,
+          "tris": 495861,
+          "ms": 6227
+        },
+        {
+          "stop": 99,
+          "label": "Bedroom 4 Bath",
+          "inside": true,
+          "calls": 173,
+          "sceneCalls": 111,
+          "mirrorCalls": 35,
+          "tris": 538221,
+          "ms": 3948
+        },
+        {
+          "stop": 113,
+          "label": "Study",
+          "inside": true,
+          "calls": 156,
+          "sceneCalls": 97,
+          "mirrorCalls": 32,
+          "tris": 480583,
+          "ms": 672
+        },
+        {
+          "stop": 120,
+          "label": "Bedroom 2",
+          "inside": true,
+          "calls": 201,
+          "sceneCalls": 140,
+          "mirrorCalls": 34,
+          "tris": 527423,
+          "ms": 6583
+        },
+        {
+          "stop": 123,
+          "label": "Jack & Jill Bath",
+          "inside": true,
+          "calls": 139,
+          "sceneCalls": 92,
+          "mirrorCalls": 20,
+          "tris": 493687,
+          "ms": 3781
+        },
+        {
+          "stop": 126,
+          "label": "Bedroom 3",
+          "inside": true,
+          "calls": 297,
+          "sceneCalls": 90,
+          "mirrorCalls": 20,
+          "tris": 708983,
+          "ms": 962
+        },
+        {
+          "stop": 153,
+          "label": "Game & Media Room",
+          "inside": true,
+          "calls": 375,
+          "sceneCalls": 160,
+          "mirrorCalls": 35,
+          "tris": 755203,
+          "ms": 4557
+        },
+        {
+          "stop": 156,
+          "label": "Golf Simulator",
+          "inside": true,
+          "calls": 157,
+          "sceneCalls": 98,
+          "mirrorCalls": 32,
+          "tris": 507377,
+          "ms": 3922
+        },
+        {
+          "stop": 159,
+          "label": "Game & Media Room",
+          "inside": true,
+          "calls": 173,
+          "sceneCalls": 111,
+          "mirrorCalls": 35,
+          "tris": 487361,
+          "ms": 6481
+        },
+        {
+          "stop": 163,
+          "label": "Lower Bath",
+          "inside": true,
+          "calls": 129,
+          "sceneCalls": 80,
+          "mirrorCalls": 22,
+          "tris": 454959,
+          "ms": 4719
+        },
+        {
+          "stop": 167,
+          "label": "Bedroom 5",
+          "inside": true,
+          "calls": 160,
+          "sceneCalls": 98,
+          "mirrorCalls": 35,
+          "tris": 483361,
+          "ms": 732
+        },
+        {
+          "stop": 173,
+          "label": "Home Gym",
+          "inside": true,
+          "calls": 179,
+          "sceneCalls": 117,
+          "mirrorCalls": 35,
+          "tris": 493579,
+          "ms": 5781
+        },
+        {
+          "stop": 185,
+          "label": "Pool Terrace",
+          "inside": false,
+          "calls": 114,
+          "sceneCalls": 54,
+          "mirrorCalls": 33,
+          "tris": 415701,
+          "ms": 976
+        },
+        {
+          "stop": 198,
+          "label": "Boat Dock",
+          "inside": false,
+          "calls": 94,
+          "sceneCalls": 35,
+          "mirrorCalls": 32,
+          "tris": 395497,
+          "ms": 175
+        }
+      ],
+      "travelSamples": 91,
+      "inside": {
+        "maxSceneCalls": 223,
+        "maxFrameCalls": 429
+      },
+      "outside": {
+        "maxSceneCalls": 232,
+        "maxFrameCalls": 494
+      },
+      "maxTris": 887167,
+      "softwareMs": {
+        "avg": 2976,
+        "p95": 7301,
+        "p99": 9380
+      }
+    }
+  },
+  "gpuMemoryMB": {
+    "at": "1920×1080, High",
+    "total": 303,
+    "textures": 269,
+    "buffers": 26,
+    "renderbuffers": 8
+  },
+  "download": {
+    "rawMB": 34.9,
+    "downloadMB": 33.8,
+    "firstViewSoftwareS": 15.82
+  }
+}
