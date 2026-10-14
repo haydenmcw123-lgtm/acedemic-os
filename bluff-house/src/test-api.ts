@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { Furniture } from './furniture/furnish';
 import type { Lake } from './render/lake';
+import type { Lightmaps } from './lighting/lightmaps';
+import type { Probes } from './lighting/probes';
 import type { BuiltHouse } from './build/house';
 import { levelOfFeet } from './data/house';
 import { PLAYER, type MoveInput, type PlayerController } from './player/controller';
@@ -22,6 +24,9 @@ interface Deps {
   built: BuiltHouse;
   furniture: Furniture;
   lake: Lake;
+  lightmaps: Lightmaps;
+  probes: Probes;
+  setBaked: (on: boolean) => void;
   player: PlayerController;
   culler: LevelCuller;
   director: Director;
@@ -403,6 +408,9 @@ export function installTestApi(d: Deps) {
       }
       return { problems, fixes, doors, art, items: f.items.length, walls: built.ctx.wallPieces.length };
     },
+    /** Baked GI on/off (before/after) and its state. */
+    bakedGI(on: boolean) { d.setBaked(on); },
+    lightmapInfo: () => ({ ...d.lightmaps.info, probes: d.probes.probes.map((p) => ({ id: p.id, captured: !!p.tex, min: p.min.toArray(), max: p.max.toArray() })), activeProbe: d.probes.active?.id ?? null, captures: d.probes.captures }),
     setFurnished(on: boolean, animate = false) { d.furniture.setFurnished(on, animate); },
     furnitureState() {
       const f = d.furniture, loose = f.items.filter((i) => !i.builtIn), built = f.items.filter((i) => i.builtIn);

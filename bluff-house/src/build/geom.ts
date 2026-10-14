@@ -120,7 +120,7 @@ export class GeoBuilder {
       geo.computeBoundingSphere();
       const mat = materialFor(b.mat, b.group);
       const m = new THREE.Mesh(geo, mat);
-      m.name = b.group + ':' + b.mat;
+      m.name = b.group + ':' + b.mat + (b.castShadow ? '' : ':noshadow'); // unique per bucket (the bake maps lightmap UVs by name)
       m.castShadow = b.castShadow && mat.userData.castShadow !== false; m.receiveShadow = true;
       m.userData.mat = b.mat;
       groups.get(b.group)!.add(m);

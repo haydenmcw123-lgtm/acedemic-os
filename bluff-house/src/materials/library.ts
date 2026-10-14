@@ -142,7 +142,7 @@ const cache = new Map<string, THREE.Material>();
  * Materials in the "loose" pool belong only to movable furniture, so the Furnished toggle can fade
  * them without touching the architecture that shares the same finishes.
  */
-export type Pool = 'arch' | 'loose';
+export type Pool = 'arch' | 'loose' | 'baked';
 export const LOOSE_MATERIALS: THREE.MeshStandardMaterial[] = [];
 /** Interior-variant materials: they reflect the interior environment instead of the sky. */
 export const INTERIOR_MATERIALS: THREE.MeshStandardMaterial[] = [];
@@ -150,16 +150,16 @@ export const INTERIOR_MATERIALS: THREE.MeshStandardMaterial[] = [];
 export const EMISSIVE_FIXTURES: THREE.MeshStandardMaterial[] = [];
 
 export function material(key: string, variant: Variant = 'ext', pool: Pool = 'arch'): THREE.Material {
-  const ck = key + '|' + variant + (pool === 'loose' ? '|loose' : '');
+  const ck = key + '|' + variant + (pool === 'arch' ? '' : '|' + pool);
   let m = cache.get(ck);
   if (m) return m;
-  if (pool === 'loose') {
+  if (pool !== 'arch') {
     const src = material(key, variant);
     m = src.clone();
     // clone() deep-copies userData through JSON, which turns object references into plain data
     m.userData.depthMat = src.userData.depthMat;
   } else m = make(key, variant);
-  m.name = ck;
+  m.name = pool === 'arch' ? ck : key + '|' + variant; // baked/loose copies keep the base name (key|variant)
   const std = (m as THREE.MeshStandardMaterial).isMeshStandardMaterial ? (m as THREE.MeshStandardMaterial) : null;
   if (std && variant === 'int') INTERIOR_MATERIALS.push(std);
   if (std && pool === 'loose') {

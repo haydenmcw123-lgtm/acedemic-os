@@ -7,7 +7,7 @@ const PORT = +(process.env.PORT ?? 5173);
 // fixed timestep through window.__app instead of letting the render loop run.
 export default defineConfig({
   testDir: 'tests',
-  timeout: 180_000,
+  timeout: 600_000, // software rendering: boot now bakes in lightmaps and six probe captures
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],

@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "plans": "tsx scripts/gen-plans.ts",
-    "assets": "tsx scripts/fetch-assets.ts"
+    "assets": "tsx scripts/fetch-assets.ts",
+    "bake:export": "tsx scripts/bake-export.ts",
+    "bake": "tsx scripts/bake-export.ts && blender -b -P scripts/bake.py -- bake public/lightmaps"
   },
   "dependencies": {
     "n8ao": "2.0.1",

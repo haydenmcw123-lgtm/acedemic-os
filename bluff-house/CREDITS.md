@@ -10,6 +10,12 @@
 | [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh) | 0.9.16 | MIT | collision and sight-line queries |
 | [Inter](https://rsms.me/inter/) (Google Fonts) | — | SIL OFL 1.1 | UI type |
 
+## Tools
+
+| Tool | Version | License | Used for |
+|---|---|---|---|
+| [Blender](https://www.blender.org) (Cycles) | 4.0.2 | GPL (tool only: the baked lightmaps are this project's output) | lightmap UVs and the GI bake (`scripts/bake.py`) |
+
 ## Models and textures
 
 **Everything you see is generated in code from `house-data.json`** — no third-party art is bundled yet:

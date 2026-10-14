@@ -12,6 +12,8 @@ export class InteriorEnv {
   private pmrem: THREE.PMREMGenerator;
   private rt: THREE.WebGLRenderTarget | null = null;
   texture: THREE.Texture | null = null;
+  /** A room probe in use (Stage 5): interior materials show it instead of this stand-in. */
+  override: THREE.Texture | null = null;
   private floor: THREE.MeshBasicMaterial;
   private walls: THREE.MeshBasicMaterial;
   private ceil: THREE.MeshBasicMaterial;
@@ -58,6 +60,12 @@ export class InteriorEnv {
     this.rt?.dispose();
     this.rt = rt;
     this.texture = rt.texture;
-    for (const m of INTERIOR_MATERIALS) { if (!m.userData.hadEnv) { m.needsUpdate = true; m.userData.hadEnv = true; } m.envMap = this.texture; }
+    this.assign();
+  }
+
+  /** Points every interior material at the active room probe, or at this stand-in. */
+  assign() {
+    const tex = this.override ?? this.texture;
+    for (const m of INTERIOR_MATERIALS) { if (!m.userData.hadEnv) { m.needsUpdate = true; m.userData.hadEnv = true; } m.envMap = tex; }
   }
 }

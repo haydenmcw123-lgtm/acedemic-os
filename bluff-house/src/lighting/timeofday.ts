@@ -16,6 +16,8 @@ export const PRESETS: [string, number][] = [['Morning', 8], ['Noon', 12.5], ['Go
 export const TIME_RANGE = { min: 6.5, max: 21 };
 
 const sstep = (a: number, b: number, v: number) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+/** Sky-light level (0 night … 1 day) at a clock time: the same curve the rig uses below. */
+export const daylightAt = (h: number) => sstep(-6, 10, sunPosition(Y, M, D, h, lat, lon, UTC_OFFSET).elevation);
 const SUN_HIGH = new THREE.Color(1.0, 0.96, 0.9), SUN_LOW = new THREE.Color(1.0, 0.62, 0.32);
 // horizon haze color by sun elevation (linear RGB)
 const HAZE: [number, THREE.Color][] = [
@@ -51,7 +53,7 @@ export class TimeOfDay {
   private envArgs: Parameters<InteriorEnv['set']> | null = null;
   private envTimer = 0;
 
-  constructor(private rig: RenderRig, private sky: SkyRig, private interior: InteriorLights, private interiorEnv: InteriorEnv) {}
+  constructor(private rig: RenderRig, private sky: SkyRig, private interior: InteriorLights, readonly interiorEnv: InteriorEnv) {}
 
   set(h: number) {
     this.hour = THREE.MathUtils.clamp(h, TIME_RANGE.min, TIME_RANGE.max);
@@ -83,7 +85,7 @@ export class TimeOfDay {
     this.envArgs = [day, skyTint, direct, sun.color.clone(), lightsOn];
     // exposure targets: open up as the light fades
     this.exposureOutside = 0.85 + 2.2 * (1 - day);
-    this.exposureInside = 1.05 + 0.35 * (1 - day);
+    this.exposureInside = 1.6 + 0.3 * (1 - day); // interiors exposed for the room (baked light is physically dimmer than outdoors)
     this.shadowDirty = true;
     this.onChange(this.hour);
   }

@@ -4,6 +4,8 @@ import { siteBlocked } from './build/landscape';
 import { buildTrees, wind } from './build/trees';
 import { buildWorld, LAKE_Y, LOT } from './build/world';
 import { Lake } from './render/lake';
+import { Lightmaps } from './lighting/lightmaps';
+import { Probes } from './lighting/probes';
 import { Fire } from './lighting/fire';
 import { buildOutdoorLights } from './lighting/outdoor';
 import { Furniture } from './furniture/furnish';
@@ -14,7 +16,7 @@ import { fmtClock } from './lighting/sun';
 import { InteriorLights } from './lighting/interior';
 import { InteriorEnv } from './lighting/interiorEnv';
 import { SkyRig } from './lighting/sky';
-import { DAY, TimeOfDay } from './lighting/timeofday';
+import { DAY, daylightAt, TimeOfDay } from './lighting/timeofday';
 import { PlayerController } from './player/controller';
 import { Director } from './player/director';
 import { Input } from './player/input';
@@ -84,6 +86,28 @@ built.groups.get('L1i')!.add(fire.group);
 const post = new Post(rig.renderer, rig.scene, rig.camera, 'agx');
 rig.onResize.push((w, h) => post.setSize(w, h));
 const time = new TimeOfDay(rig, sky, interior, new InteriorEnv(rig.renderer));
+// baked GI (Stage 5): loads in the background; until it arrives the real-time stand-in lighting shows
+const lightmaps = new Lightmaps(rig.renderer);
+const probes = new Probes(rig.renderer, rig.scene, built.plan);
+let probeRoom: string | null | undefined;
+/** Room probes: the probe of the room the camera is in drives interior reflections. */
+function updateProbe(force = false) {
+  const room = culler.inside ? built.plan.roomAt(culler.level, player.x, player.z)?.id ?? null : null;
+  if (room === probeRoom && !force && !(probes.active?.stale)) return;
+  probeRoom = room;
+  time.interiorEnv.override = probes.update(room);
+  time.interiorEnv.assign();
+}
+const lightmapsLoaded = lightmaps.load([...built.groups.values()]).then((ok) => {
+  probes.patchMaterials();
+  if (ok) {
+    lightmaps.setTime(time.hour, daylightAt); lightmaps.update(0, true);
+    probes.captureAll(); // all six behind the loader: walking into a room never waits on a capture
+    rig.renderer.compile(rig.scene, rig.camera);
+    console.info(`Baked GI: ${lightmaps.receivers.length} surfaces lightmapped`);
+  } else console.info('Baked GI: no lightmaps (run pnpm bake): real-time lighting only');
+  for (const p of lightmaps.problems) console.warn('lightmaps: ' + p);
+});
 const impostorLight = (trees.group.getObjectByName('trees:impostors') as THREE.Mesh).material as THREE.ShaderMaterial;
 time.outdoor = (deep, haze, dir, sunColor, sunI, skyCol, skyI) => {
   lake.setLight(deep, haze, dir, sunColor, sunI);
@@ -153,7 +177,7 @@ director.onModeChange = (m) => {
   chipText.textContent = m === 'tour' ? 'Guided tour' : 'Free walk';
 };
 director.onTourDone = () => dock.toast('Tour complete · walk freely, or press R to go again', 4000);
-time.onChange = (h) => dock.setTime(h);
+time.onChange = (h) => { dock.setTime(h); lightmaps.setTime(h, daylightAt); probes.invalidate(); };
 director.onModeChange(director.mode);
 
 input.on('Space', () => { if (measure.on) toggleMeasure(); director.toggle(); });
@@ -162,6 +186,9 @@ input.on('KeyL', () => dock.setSizes(labels.toggle()));
 input.on('KeyM', toggleMeasure);
 input.on('KeyF', () => toggleFurnished());
 input.on('KeyT', () => time.nextPreset());
+input.on('KeyB', () => { setBaked(!lightmaps.enabled); dock.toast(lightmaps.enabled ? 'Baked GI + probes on' : 'Baked GI + probes off (Stage 4 lighting)'); });
+/** Baked GI and room probes together (B, and the before/after proof). */
+function setBaked(on: boolean) { lightmaps.setEnabled(on); probes.enabled = on; updateProbe(true); }
 input.on('KeyH', () => dock.toggleHint());
 input.on('Escape', () => { if (measure.on) toggleMeasure(); });
 input.onUnlock = () => { if (measure.on) measure.cancel(); };
@@ -178,6 +205,7 @@ input.on('KeyC', () => { built.collider.visible = !built.collider.visible; });
 const jump: [number, number, number][] = [[21, 23, FLOOR_Y[0]], [13, 33, FLOOR_Y[1]], [28, 19.6, FLOOR_Y[2]]];
 (['Digit1', 'Digit2', 'Digit3'] as const).forEach((k, i) => input.on(k, () => { director.pause(); player.teleport(jump[i][0], jump[i][1], jump[i][2]); }));
 
+let probeTimer = 0;
 /** One simulation + presentation step. Shared by the render loop and the test driver. */
 function step(dt: number) {
   input.update();
@@ -194,6 +222,9 @@ function step(dt: number) {
   if (furniture.shadowsDirty) { furniture.shadowsDirty = false; rig.renderer.shadowMap.needsUpdate = true; }
   director.apply(rig.camera);
   time.tick(dt, culler.inside);
+  lightmaps.update(dt);
+  probeTimer -= dt;
+  if (probeTimer <= 0) { probeTimer = 0.5; updateProbe(); } // re-capture at most twice a second
   wind.time.value += dt;
   fire.update(dt);
   interior.update(rig.camera.position, player.feet, culler.inside, dt);
@@ -240,6 +271,8 @@ requestAnimationFrame(() => { loader.style.opacity = '0'; setTimeout(() => loade
 /** Renders one fully settled frame (tests): env map, shadows, lights and exposure all up to date. */
 function renderSettled() {
   time.tick(0, culler.inside, true);
+  lightmaps.update(0, true);
+  updateProbe(true);
   interior.update(rig.camera.position, player.feet, culler.inside, 0, true);
   post.exposure.exposure = time.exposure;
   rig.renderer.shadowMap.needsUpdate = true;
@@ -247,5 +280,5 @@ function renderSettled() {
 }
 // downloaded furniture models (if any) replace their stand-ins as they arrive
 void loadModels(furniture).then((n) => { if (n) console.info(`Furniture: ${n} downloaded models in place of their stand-ins`); });
-if (TEST) installTestApi({ rig, built, furniture, lake, player, culler, director, tour, time, caption, labels, measure, step, post, interior, renderSettled, squareFootage: sf });
+if (TEST) void lightmapsLoaded.then(() => installTestApi({ rig, built, furniture, lake, lightmaps, probes, setBaked, player, culler, director, tour, time, caption, labels, measure, step, post, interior, renderSettled, squareFootage: sf }));
 else rig.renderer.setAnimationLoop(frame);
