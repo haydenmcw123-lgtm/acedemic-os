@@ -284,5 +284,6 @@
    "offset": 24240
   }
  ],
- "note": "lighting = irradiance/\u03c0, stored as sRGB PNG scaled by 1/maxValue"
+ "note": "lighting = irradiance/\u03c0, stored as sRGB PNG scaled by 1/maxValue",
+ "ktx2": true
 }

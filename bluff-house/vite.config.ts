@@ -5,6 +5,9 @@ import { defineConfig } from 'vite';
 const frozen = !!process.env.FROZEN;
 
 export default defineConfig({
+  // BASE_PATH: where the site is served from. `/` locally; `/<repo>/<folder>/` on GitHub Pages
+  // (scripts/deploy-pages.ts sets it). Every asset URL in the app is relative to it.
+  base: process.env.BASE_PATH ?? '/',
   server: { port: 5173, strictPort: true, hmr: frozen ? false : undefined, watch: frozen ? { ignored: ['**/*'] } : undefined },
-  build: { target: 'es2022', sourcemap: true },
+  build: { target: 'es2022', sourcemap: process.env.SOURCEMAP !== '0', chunkSizeWarningLimit: 2000 },
 });

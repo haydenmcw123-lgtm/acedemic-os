@@ -20,6 +20,8 @@ interface Manifest {
   res: number; maxValue: number; skyFactor: number;
   times: { name: string; hour: number; file: string }[];
   ao: string; uv2: string;
+  /** Set by `pnpm textures`: KTX2 copies of the maps sit next to the PNGs. */
+  ktx2?: boolean;
   objects: { name: string; tris: number; offset: number }[];
 }
 
@@ -53,7 +55,7 @@ export class Lightmaps {
     const uv = new Float32Array(await (await fetch(base + m.uv2)).arrayBuffer());
     // KTX2 if `pnpm textures` made it (flipped at encode time), else the PNG (flipY on: Blender's UV
     // (0,0) is the bottom-left)
-    const ktx = this.ktx2 && (await fetch(base + m.ao.replace(/\.png$/, '.ktx2'), { method: 'HEAD' }).then((r) => r.ok && !(r.headers.get('content-type') ?? '').includes('html')).catch(() => false));
+    const ktx = !!this.ktx2 && m.ktx2 === true; // `pnpm textures` sets it when it writes the .ktx2 copies
     this.format = ktx ? 'ktx2' : 'png';
     const png = new THREE.TextureLoader();
     const load = async (f: string) => {

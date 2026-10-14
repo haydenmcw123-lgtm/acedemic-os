@@ -73,6 +73,7 @@ async function main() {
       fs.writeFileSync(path.join(LM, f.replace(/\.png$/, '.ktx2')), out);
       lb += out.length;
     }
+    fs.writeFileSync(lm, JSON.stringify({ ...m, ktx2: true }, null, 1)); // the app loads the .ktx2 copies when this is set
     console.log(`lightmaps → ${(lb / 1048576).toFixed(1)} MB KTX2`);
   }
 
